@@ -58,7 +58,7 @@ src/
 
 ```bash
 # 首次上线：在 GitHub 建空仓库后
-git remote add origin git@github.com:<user>/overseas-merch-ops-workbench.git
+git remote add origin git@github.com:<user>/merch-ops-workbench.git
 git push -u origin main        # CI 会自动运行 npm run check
 
 # 日常同步
