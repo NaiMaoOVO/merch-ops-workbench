@@ -108,3 +108,30 @@ export function aggregateTrafficWithSales(trafficRows, salesRows, options = {}) 
     return { ...row, paid: summary?.paid ?? 0, addToCart: summary?.addToCart ?? 0, salesAmount: summary?.salesAmount ?? 0 };
   });
 }
+
+/** 今日概览：最近数据日环比 + 异常 Top3 + 今日到期/逾期任务数。 */
+export function buildTodayBrief({ trend = [], diagnostics = [], tasks = [], now = new Date() } = {}) {
+  const series = (Array.isArray(trend) ? trend : []).filter((point) => point?.date != null && point.date !== '');
+  const last = series[series.length - 1] ?? null;
+  const prev = series[series.length - 2] ?? null;
+  const changePct = last && prev && Number(prev.value) > 0
+    ? Math.round(((Number(last.value) - Number(prev.value)) / Number(prev.value)) * 1000) / 10
+    : null;
+  const priorityRank = { 高: 0, 中: 1, 低: 2 };
+  const topIssues = (Array.isArray(diagnostics) ? diagnostics : [])
+    .filter((item) => item?.status !== '已解决')
+    .sort((a, b) => (priorityRank[a?.priority] ?? 3) - (priorityRank[b?.priority] ?? 3))
+    .slice(0, 3)
+    .map((item) => ({ finding: String(item.finding ?? ''), priority: item.priority ?? '中' }));
+  const pad = (value) => String(value).padStart(2, '0');
+  const todayStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+  const openTasks = (Array.isArray(tasks) ? tasks : []).filter((task) => task?.status !== '已完成' && task?.status !== '已取消');
+  return {
+    date: last?.date ?? null,
+    yesterdayValue: last ? Number(last.value) : null,
+    changePct,
+    topIssues,
+    dueToday: openTasks.filter((task) => task.dueDate === todayStr).length,
+    overdue: openTasks.filter((task) => task.dueDate && task.dueDate < todayStr).length,
+  };
+}

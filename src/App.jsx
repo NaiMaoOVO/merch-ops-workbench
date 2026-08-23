@@ -41,7 +41,7 @@ import { applyTaskResolutions, diagnosticToIssuePayload, diagnosticToTaskPayload
 import { createAnalysisProject, estimateProjectBytes, findLatestAnalysisProject, formatBytes, removeAnalysisProject, saveAnalysisProject, saveAnalysisSummary } from './lib/projects/index.js';
 import { buildAnalysisSnapshot } from './lib/projects/index.js';
 import { buildTrendSeries, computeDerivedMetrics, computePeriodComparison, createRule, evaluateRules, filterAnalysisRows } from './lib/analysis/metrics.js';
-import { aggregateTrafficWithSales, buildDiagnostic, buildImportedAnalysis, detectAnomalies } from './lib/analysis/index.js';
+import { aggregateTrafficWithSales, buildDiagnostic, buildImportedAnalysis, buildTodayBrief, detectAnomalies } from './lib/analysis/index.js';
 import { buildSparklinePoints } from './lib/analysis/sparkline.js';
 import { buildFunnel, buildPivot } from './lib/analysis/pivot.js';
 import { exportReportWorkbook } from './lib/export/index.js';
@@ -177,6 +177,7 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
   ];
   const resolvedDiagnosticCount = applyTaskResolutions(summary?.diagnostics ?? [], savedTasks).filter((item) => item.status === '已解决').length;
   const openDiagnosticCount = summary ? Math.max((summary.diagnostics?.length ?? 0) - resolvedDiagnosticCount, 0) : null;
+  const todayBrief = buildTodayBrief({ trend: summary?.trend ?? [], diagnostics: summary?.diagnostics ?? [], tasks: savedTasks });
   const openTaskCount = savedTasks.filter((item) => item.status !== '已完成' && item.status !== '已取消').length;
   const openSupplierIssueCount = savedIssues.filter((item) => item.status !== '已解决' && item.status !== '已关闭').length;
   const dashboardTasks = getDashboardTasks(savedTasks, savedIssues);
@@ -200,6 +201,17 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
         </div>
       </section>
 
+      {(todayBrief.yesterdayValue != null || todayBrief.topIssues.length > 0 || todayBrief.dueToday > 0 || todayBrief.overdue > 0) && (
+        <section className="glass-card" style={{ padding: '12px 18px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <strong style={{ fontSize: 14 }}>今日概览</strong>
+            {todayBrief.yesterdayValue != null && <span className="soft-status">最近数据日 {todayBrief.date}：销售额 {todayBrief.yesterdayValue.toLocaleString()}{todayBrief.changePct != null ? `（环比 ${todayBrief.changePct > 0 ? '+' : ''}${todayBrief.changePct}%）` : ''}</span>}
+            {todayBrief.topIssues.map((item) => <span key={item.finding} className="soft-status">⚠ {item.finding}（{item.priority}）</span>)}
+            {todayBrief.dueToday > 0 && <span className="priority-tag">今日到期任务 {todayBrief.dueToday}</span>}
+            {todayBrief.overdue > 0 && <span className="priority-tag">逾期 {todayBrief.overdue}</span>}
+          </div>
+        </section>
+      )}
       <section aria-labelledby="metric-title">
         <div className="section-heading">
           <div><span className="section-kicker">THIS WEEK</span><h2 id="metric-title">本周数据概览</h2></div>
@@ -382,6 +394,7 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
         dataSource: '本地导入',
         rowCount: filteredImportedRows.length,
         totals,
+        trend: importedTrend,
         diagnostics,
       });
     } catch { /* 只读环境忽略 */ }
