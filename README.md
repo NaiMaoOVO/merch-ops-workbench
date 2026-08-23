@@ -54,6 +54,19 @@ src/
 - 分析口径必须可解释：每个比率在代码与报告中都保留公式来源；缺数据显示“尚未配置”，不伪造 0。
 - 提交前运行 `npm run check`。
 
+## 发布与同步（维护者）
+
+```bash
+# 首次上线：在 GitHub 建空仓库后
+git remote add origin git@github.com:<user>/overseas-merch-ops-workbench.git
+git push -u origin main        # CI 会自动运行 npm run check
+
+# 日常同步
+git add -A && git commit -m "feat: ..." && git push
+```
+
+文档同步约定：功能更新时同步修改 `docs/SOP.md` 与飞书 wiki 教程页。
+
 ## License
 
 [MIT](./LICENSE)
