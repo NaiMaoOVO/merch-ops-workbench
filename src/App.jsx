@@ -42,6 +42,7 @@ import { createAnalysisProject, estimateProjectBytes, findLatestAnalysisProject,
 import { buildAnalysisSnapshot } from './lib/projects/index.js';
 import { buildTrendSeries, computeDerivedMetrics, computePeriodComparison, createRule, evaluateRules, filterAnalysisRows } from './lib/analysis/metrics.js';
 import { aggregateTrafficWithSales, buildDiagnostic, buildImportedAnalysis, buildTodayBrief, detectAnomalies } from './lib/analysis/index.js';
+import { enableAndSendDailyNotification, queryNotifyPermission } from './lib/notify/index.js';
 import { buildSparklinePoints } from './lib/analysis/sparkline.js';
 import { buildFunnel, buildPivot } from './lib/analysis/pivot.js';
 import { exportReportWorkbook } from './lib/export/index.js';
@@ -178,6 +179,18 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
   const resolvedDiagnosticCount = applyTaskResolutions(summary?.diagnostics ?? [], savedTasks).filter((item) => item.status === '已解决').length;
   const openDiagnosticCount = summary ? Math.max((summary.diagnostics?.length ?? 0) - resolvedDiagnosticCount, 0) : null;
   const todayBrief = buildTodayBrief({ trend: summary?.trend ?? [], diagnostics: summary?.diagnostics ?? [], tasks: savedTasks });
+  const [notifyState, setNotifyState] = useState(() => queryNotifyPermission());
+  const notifySentRef = useRef(false);
+  useEffect(() => {
+    if (notifyState !== 'granted' || notifySentRef.current) return;
+    notifySentRef.current = true;
+    enableAndSendDailyNotification({ overdueTasks: todayBrief.overdue, dueTodayTasks: todayBrief.dueToday, highRiskDiagnostics: (summary?.diagnostics ?? []).filter((item) => item.priority === '高' && item.status !== '已解决').length });
+  }, [notifyState]);
+  const requestNotifications = async () => {
+    const sent = await enableAndSendDailyNotification({ overdueTasks: todayBrief.overdue, dueTodayTasks: todayBrief.dueToday, highRiskDiagnostics: (summary?.diagnostics ?? []).filter((item) => item.priority === '高' && item.status !== '已解决').length });
+    setNotifyState(queryNotifyPermission());
+    if (!sent) setNotifyState((current) => current);
+  };
   const openTaskCount = savedTasks.filter((item) => item.status !== '已完成' && item.status !== '已取消').length;
   const openSupplierIssueCount = savedIssues.filter((item) => item.status !== '已解决' && item.status !== '已关闭').length;
   const dashboardTasks = getDashboardTasks(savedTasks, savedIssues);
@@ -209,6 +222,7 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
             {todayBrief.topIssues.map((item) => <span key={item.finding} className="soft-status">⚠ {item.finding}（{item.priority}）</span>)}
             {todayBrief.dueToday > 0 && <span className="priority-tag">今日到期任务 {todayBrief.dueToday}</span>}
             {todayBrief.overdue > 0 && <span className="priority-tag">逾期 {todayBrief.overdue}</span>}
+            {notifyState === 'default' && <button className="text-button" onClick={requestNotifications}>开启桌面提醒</button>}
           </div>
         </section>
       )}
