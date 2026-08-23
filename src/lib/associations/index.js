@@ -68,3 +68,19 @@ export function summariseByStatus(records, projectId) {
   }
   return { total, byStatus: summary };
 }
+
+/** 任务完成后，把由该诊断转出的条目自动标记为「已解决」。 */
+export function applyTaskResolutions(diagnostics, tasks = []) {
+  const list = Array.isArray(diagnostics) ? diagnostics : [];
+  const resolvedSourceIds = new Set(
+    (Array.isArray(tasks) ? tasks : [])
+      .filter((task) => task?.status === '已完成' && task?.sourceDiagnosticId)
+      .map((task) => String(task.sourceDiagnosticId)),
+  );
+  if (resolvedSourceIds.size === 0) return list;
+  return list.map((item) => (
+    resolvedSourceIds.has(String(item?.id)) && item?.status !== '已解决'
+      ? { ...item, status: '已解决' }
+      : item
+  ));
+}

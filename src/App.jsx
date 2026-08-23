@@ -37,7 +37,7 @@ import {
 import { applyManualMapping, chainJoins, checkDataQuality, matchTables, parseSpreadsheet, previewTable, suggestFieldMappings, suggestJoinKeys } from './lib/data/index.js';
 import { buildAnomalyHypothesisRequest, buildChatEndpoint, callChatCompletion, readSavedSettings } from './lib/ai/index.js';
 import { validateAiConfig } from './features/settings/index.js';
-import { diagnosticToIssuePayload, diagnosticToTaskPayload } from './lib/associations/index.js';
+import { applyTaskResolutions, diagnosticToIssuePayload, diagnosticToTaskPayload } from './lib/associations/index.js';
 import { createAnalysisProject, estimateProjectBytes, findLatestAnalysisProject, formatBytes, removeAnalysisProject, saveAnalysisProject, saveAnalysisSummary } from './lib/projects/index.js';
 import { buildAnalysisSnapshot } from './lib/projects/index.js';
 import { buildTrendSeries, computeDerivedMetrics, computePeriodComparison, createRule, evaluateRules, filterAnalysisRows } from './lib/analysis/metrics.js';
@@ -173,8 +173,10 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
     { label: '销售额', value: totals ? `¥ ${Math.round(totals.salesAmount).toLocaleString()}` : null, trend: totals ? `${summary.rowCount} 行导入明细` : '导入数据后生成', icon: TrendingUp, tone: 'pink' },
     { label: '曝光量', value: totals ? totals.impressions.toLocaleString() : null, trend: totals ? `${totals.clicks.toLocaleString()} 次点击` : '导入后生成', icon: CloudSun, tone: 'purple' },
     { label: '点击率', value: totals ? `${(totals.clickRate * 100).toFixed(2)}%` : null, trend: totals ? `支付 ${totals.paid.toLocaleString()} 件` : '导入后生成', icon: PackageSearch, tone: 'blue' },
-    { label: '待确认异常', value: summary ? String(summary.diagnostics?.length ?? 0) : null, trend: summary ? (summary.diagnostics?.some((item) => item.priority === '高') ? '含高优先级' : '暂无高优先级') : '分析后生成', icon: AlertTriangle, tone: 'orange' },
+    { label: '待确认异常', value: openDiagnosticCount == null ? null : String(openDiagnosticCount), trend: openDiagnosticCount == null ? '分析后生成' : (openDiagnosticCount === 0 && (summary?.diagnostics?.length ?? 0) > 0 ? '已全部解决 ✓' : ((summary?.diagnostics ?? []).some((item) => item.priority === '高') ? '含高优先级' : '暂无高优先级')), icon: AlertTriangle, tone: 'orange' },
   ];
+  const resolvedDiagnosticCount = applyTaskResolutions(summary?.diagnostics ?? [], savedTasks).filter((item) => item.status === '已解决').length;
+  const openDiagnosticCount = summary ? Math.max((summary.diagnostics?.length ?? 0) - resolvedDiagnosticCount, 0) : null;
   const openTaskCount = savedTasks.filter((item) => item.status !== '已完成' && item.status !== '已取消').length;
   const openSupplierIssueCount = savedIssues.filter((item) => item.status !== '已解决' && item.status !== '已关闭').length;
   const dashboardTasks = getDashboardTasks(savedTasks, savedIssues);
