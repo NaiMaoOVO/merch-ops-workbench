@@ -1,0 +1,34 @@
+{
+  "name": "overseas-merch-ops-workbench",
+  "description": "本地优先的海外商品运营工作台：导入 Excel/CSV，完成字段映射、多表匹配、指标分析、异常诊断与多格式周报导出；AI 仅作脱敏后的辅助假设。",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cross-border-commerce",
+    "operations-workbench",
+    "local-first",
+    "react",
+    "vite",
+    "excel-analysis",
+    "product-operations"
+  ],
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5174 --strictPort",
+    "build": "vite build",
+    "test": "node --test",
+    "check": "npm run test && npm run build"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.1.0",
+    "lucide-react": "^1.33.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "vite": "^8.2.2",
+    "xlsx": "^0.18.5"
+  }
+}

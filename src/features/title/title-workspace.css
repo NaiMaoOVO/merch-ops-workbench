@@ -1,0 +1,123 @@
+.title-workspace {
+  display: grid;
+  gap: 16px;
+  color: #342b36;
+}
+
+.title-workspace__toolbar,
+.title-workspace__item {
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 12px 32px rgba(190, 128, 167, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.title-workspace__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  padding: 16px;
+}
+
+.title-workspace__field {
+  display: grid;
+  gap: 6px;
+  min-width: 150px;
+  font-size: 12px;
+  color: #756875;
+}
+
+.title-workspace__field select,
+.title-workspace__field input {
+  min-height: 36px;
+  border: 1px solid #ead8e4;
+  border-radius: 10px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #342b36;
+}
+
+.title-workspace__button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 14px;
+  background: #d9659a;
+  color: white;
+  cursor: pointer;
+}
+
+.title-workspace__button--secondary {
+  background: #f1dce8;
+  color: #7f3f61;
+}
+
+.title-workspace__list {
+  display: grid;
+  gap: 12px;
+}
+
+.title-workspace__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 16px;
+}
+
+.title-workspace__meta,
+.title-workspace__checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.title-workspace__meta {
+  margin-bottom: 8px;
+  color: #8b7887;
+  font-size: 12px;
+}
+
+.title-workspace__original {
+  margin: 0 0 8px;
+  color: #8b7887;
+  font-size: 13px;
+}
+
+.title-workspace__candidate {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.title-workspace__diff-new { background: #ffe3ed; color: #b54d76; border-radius: 4px; padding: 0 3px; margin-right: 4px; font-weight: 600; }
+
+.title-workspace__badge {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f7e8f0;
+  color: #8f3e68;
+  font-size: 12px;
+}
+
+.title-workspace__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-workspace__empty {
+  padding: 32px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.5);
+  color: #8b7887;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .title-workspace__item {
+    grid-template-columns: 1fr;
+  }
+}

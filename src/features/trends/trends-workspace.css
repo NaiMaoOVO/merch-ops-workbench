@@ -1,0 +1,49 @@
+.trends-workspace { display: grid; gap: 16px; color: #342b36; }
+.trends-workspace__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.trends-workspace__eyebrow { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; color: #b56b8e; font-size: 12px; }
+.trends-workspace h1 { margin: 0; font-size: clamp(24px, 3vw, 34px); line-height: 1.15; }
+.trends-workspace__intro { max-width: 680px; margin: 8px 0 0; color: #806f7b; font-size: 13px; }
+.trends-workspace__actions, .trends-form__footer { display: flex; gap: 8px; flex-wrap: wrap; }
+.trends-button, .trends-import-button, .trends-icon-button { min-height: 36px; border: 1px solid #ead8e4; border-radius: 10px; padding: 0 13px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; cursor: pointer; }
+.trends-button--primary { border-color: #d9659a; background: #d9659a; color: #fff; }
+.trends-button--secondary, .trends-import-button, .trends-icon-button { background: rgba(255,255,255,.74); color: #674d5d; }
+.trends-workspace__summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.trends-workspace__summary > div, .trends-form, .trends-panel, .trends-placeholder, .trend-card, .trends-import-note { border: 1px solid rgba(255,255,255,.75); border-radius: 16px; background: rgba(255,255,255,.58); box-shadow: 0 12px 32px rgba(190,128,167,.1); backdrop-filter: blur(16px); }
+.trends-workspace__summary > div { display: grid; gap: 5px; padding: 14px; }
+.trends-workspace__summary span { color: #806f7b; font-size: 12px; }
+.trends-workspace__summary strong { font-size: 24px; }
+.trends-workspace__summary .is-hot strong { color: #bf5b50; }
+.trends-form, .trends-placeholder { display: grid; gap: 12px; padding: 16px; }
+.trends-form__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.trends-form label { display: grid; gap: 6px; color: #806f7b; font-size: 12px; }
+.trends-form input, .trends-form select, .trends-form textarea, .trends-panel select { box-sizing: border-box; width: 100%; border: 1px solid #ead8e4; border-radius: 9px; padding: 8px 10px; background: rgba(255,255,255,.86); color: #342b36; font: inherit; }
+.trends-form textarea { resize: vertical; }
+.trends-form__products { display: grid; gap: 8px; color: #806f7b; font-size: 12px; }
+.trends-form__products > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.trends-check { display: flex !important; grid-template-columns: auto 1fr; align-items: center; gap: 6px !important; padding: 7px 9px; border: 1px solid #ead8e4; border-radius: 9px; background: rgba(255,255,255,.6); }
+.trends-check input { width: auto; }
+.trends-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(120px, .25fr)) auto auto; gap: 8px; align-items: center; padding: 14px; border-bottom: 1px solid #f0e2ea; }
+.trends-search { display: flex; align-items: center; gap: 8px; border: 1px solid #ead8e4; border-radius: 9px; padding: 0 10px; background: rgba(255,255,255,.86); color: #a17f91; }
+.trends-search input { min-width: 0; border: 0; padding: 9px 0; outline: 0; background: transparent; font: inherit; }
+.trends-panel { overflow: hidden; }
+.trends-import-note { display: flex; align-items: center; gap: 8px; margin: 12px 14px 0; padding: 11px 12px; color: #806f7b; font-size: 12px; }
+.trends-import-note span { flex: 1; }
+.trends-import-note button { border: 0; background: none; color: #b56b8e; cursor: pointer; }
+.trends-list { display: grid; gap: 12px; padding: 14px; }
+.trend-card { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 18px; padding: 16px; }
+.trend-card__meta, .trend-card__chips, .trend-card__attachment { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #907e8a; font-size: 12px; }
+.trend-card__meta { margin-bottom: 7px; }
+.trend-card__meta > span, .trend-card__chips span { padding: 4px 8px; border-radius: 999px; background: #f7e8f0; }
+.trend-pill--高 { color: #a64746; background: #fde6e2 !important; }
+.trend-pill--低 { color: #537c68; background: #e4f2ea !important; }
+.trend-card__keyword { width: 100%; border: 0; padding: 2px 0; background: transparent; color: #342b36; font: inherit; font-size: 17px; font-weight: 650; }
+.trend-card__observation { width: 100%; margin-top: 7px; border: 0; padding: 2px 0; background: transparent; color: #806f7b; font: inherit; resize: vertical; }
+.trend-card__chips { margin-top: 8px; }
+.trend-card__action { margin: 9px 0 0; color: #674d5d; font-size: 12px; }
+.trend-card__attachment { margin: 8px 0 0; }
+.trend-card__side { display: grid; align-content: start; gap: 8px; }
+.trend-card__source { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 10px; border-radius: 9px; color: #b56b8e; background: #f9eaf2; font-size: 12px; text-decoration: none; }
+.trend-card__source.is-empty { color: #9c8994; background: #f5eef2; }
+.trends-empty { padding: 36px; color: #806f7b; text-align: center; }
+@media (max-width: 960px) { .trends-toolbar { grid-template-columns: 1fr 1fr 1fr; } .trends-search { grid-column: 1 / -1; } .trends-workspace__summary { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px) { .trends-workspace__header { flex-direction: column; } .trends-form__grid, .trend-card { grid-template-columns: 1fr; } .trends-workspace__summary { grid-template-columns: repeat(2, 1fr); } .trends-toolbar { grid-template-columns: 1fr 1fr; } .trends-import-button, .trends-icon-button { width: 100%; } }
