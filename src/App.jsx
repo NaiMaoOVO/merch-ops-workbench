@@ -43,6 +43,7 @@ import { buildAnalysisSnapshot } from './lib/projects/index.js';
 import { buildTrendSeries, computeDerivedMetrics, computePeriodComparison, createRule, evaluateRules, filterAnalysisRows } from './lib/analysis/metrics.js';
 import { aggregateTrafficWithSales, buildDiagnostic, buildImportedAnalysis, buildTodayBrief, detectAnomalies } from './lib/analysis/index.js';
 import { enableAndSendDailyNotification, queryNotifyPermission } from './lib/notify/index.js';
+import { getMonthlyTarget, monthProgress, setMonthlyTarget } from './lib/goals/index.js';
 import { buildSparklinePoints } from './lib/analysis/sparkline.js';
 import { buildFunnel, buildPivot } from './lib/analysis/pivot.js';
 import { exportReportWorkbook } from './lib/export/index.js';
@@ -186,6 +187,11 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
     notifySentRef.current = true;
     enableAndSendDailyNotification({ overdueTasks: todayBrief.overdue, dueTodayTasks: todayBrief.dueToday, highRiskDiagnostics: (summary?.diagnostics ?? []).filter((item) => item.priority === '高' && item.status !== '已解决').length });
   }, [notifyState]);
+  const projectId = project?.id ?? '';
+  const [monthlyTarget, setTargetState] = useState(() => getMonthlyTarget(null, projectId));
+  useEffect(() => { setTargetState(getMonthlyTarget(null, projectId)); }, [projectId]);
+  const targetProgress = monthProgress({ trend: summary?.trend ?? [], target: monthlyTarget });
+  const commitMonthlyTarget = (value) => { setMonthlyTarget(null, projectId, value); setTargetState(Math.max(0, Number(value) || 0)); };
   const requestNotifications = async () => {
     const sent = await enableAndSendDailyNotification({ overdueTasks: todayBrief.overdue, dueTodayTasks: todayBrief.dueToday, highRiskDiagnostics: (summary?.diagnostics ?? []).filter((item) => item.priority === '高' && item.status !== '已解决').length });
     setNotifyState(queryNotifyPermission());
@@ -223,6 +229,20 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
             {todayBrief.dueToday > 0 && <span className="priority-tag">今日到期任务 {todayBrief.dueToday}</span>}
             {todayBrief.overdue > 0 && <span className="priority-tag">逾期 {todayBrief.overdue}</span>}
             {notifyState === 'default' && <button className="text-button" onClick={requestNotifications}>开启桌面提醒</button>}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginTop: 10 }}>
+            <strong style={{ fontSize: 14 }}>本月目标</strong>
+            {targetProgress.target > 0 ? (
+              <>
+                <div style={{ flex: '1 1 180px', height: 8, borderRadius: 99, background: 'rgba(0,0,0,.08)', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.round((targetProgress.ratio ?? 0) * 100)}%`, height: '100%', background: targetProgress.done ? '#3a9d6d' : '#b36587' }} />
+                </div>
+                <span className="soft-status">{targetProgress.monthSales.toLocaleString()} / {targetProgress.target.toLocaleString()}（{Math.round((targetProgress.ratio ?? 0) * 100)}%）{targetProgress.done ? ' ✓ 已达标' : ` · 还差 ${targetProgress.remain.toLocaleString()}`}</span>
+              </>
+            ) : (
+              <span style={{ color: '#96707f', fontSize: 12 }}>设定后按趋势数据自动统计当月销售额进度</span>
+            )}
+            <input type="number" min="0" placeholder="目标额" value={monthlyTarget || ''} onChange={(event) => commitMonthlyTarget(event.target.value)} style={{ width: 110 }} />
           </div>
         </section>
       )}
