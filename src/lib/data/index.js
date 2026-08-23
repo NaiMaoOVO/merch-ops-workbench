@@ -368,3 +368,65 @@ function parseCsv(text, options = {}) {
 }
 
 export const readSpreadsheet = parseSpreadsheet;
+
+/* ==================== 映射记忆（P0：同结构文件自动套用上次映射） ==================== */
+
+const MAPPING_MEMORY_PREFIX = 'merch-workbench:mapping-memory:';
+const MAPPING_MEMORY_LIMIT = 20;
+
+function normalizeColumnName(header) {
+  return String(header ?? '').toLowerCase().replace(/\s+/g, '');
+}
+
+function hashText(text) {
+  let hash = 5381;
+  const source = String(text);
+  for (let index = 0; index < source.length; index += 1) {
+    hash = ((hash << 5) + hash + source.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+/** 列名指纹：与顺序无关、大小写与空白不敏感；空表返回空串。 */
+export function fingerprintColumns(headers) {
+  const names = [...new Set((Array.isArray(headers) ? headers : []).map(normalizeColumnName).filter(Boolean))].sort();
+  return names.length ? names.join('|') : '';
+}
+
+function memoryKey(fingerprint) { return MAPPING_MEMORY_PREFIX + hashText(fingerprint); }
+
+function defaultStorage() { return typeof window !== 'undefined' ? window.localStorage : null; }
+
+/** 记住某列结构下的人工映射（含自动识别后被确认过的结果）；最多保留 20 条，超出淘汰最旧。 */
+export function rememberMapping(storage, fingerprint, fieldMapping, meta = {}) {
+  const store = storage ?? defaultStorage();
+  const cleanFingerprint = String(fingerprint ?? '').trim();
+  if (!store || !cleanFingerprint || !fieldMapping || Object.keys(fieldMapping).length === 0) return false;
+  const record = { fingerprint: cleanFingerprint, fieldMapping, savedAt: meta.savedAt ?? new Date().toISOString(), label: meta.label ?? '' };
+  store.setItem(memoryKey(cleanFingerprint), JSON.stringify(record));
+  const keys = [];
+  for (let index = 0; index < store.length; index += 1) {
+    const key = store.key(index);
+    if (key && key.startsWith(MAPPING_MEMORY_PREFIX)) keys.push(key);
+  }
+  if (keys.length > MAPPING_MEMORY_LIMIT) {
+    const entries = keys.map((key) => {
+      try { return { key, savedAt: JSON.parse(store.getItem(key) ?? '{}').savedAt ?? '' }; } catch { return { key, savedAt: '' }; }
+    }).sort((a, b) => a.savedAt.localeCompare(b.savedAt));
+    entries.slice(0, entries.length - MAPPING_MEMORY_LIMIT).forEach((entry) => store.removeItem(entry.key));
+  }
+  return true;
+}
+
+/** 按列结构取回上次使用的映射；没有则返回 null。 */
+export function loadRememberedMapping(storage, fingerprint) {
+  const store = storage ?? defaultStorage();
+  if (!store) return null;
+  const raw = store.getItem(memoryKey(String(fingerprint ?? '').trim()));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed.fieldMapping === 'object' ? parsed.fieldMapping : null;
+  } catch { return null; }
+}
+

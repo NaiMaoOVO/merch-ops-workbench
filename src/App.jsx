@@ -34,7 +34,7 @@ import {
   Truck,
   Upload,
 } from 'lucide-react';
-import { applyManualMapping, chainJoins, checkDataQuality, matchTables, parseSpreadsheet, previewTable, suggestFieldMappings, suggestJoinKeys } from './lib/data/index.js';
+import { applyManualMapping, chainJoins, checkDataQuality, fingerprintColumns, loadRememberedMapping, matchTables, parseSpreadsheet, previewTable, rememberMapping, suggestFieldMappings, suggestJoinKeys } from './lib/data/index.js';
 import { buildAnomalyHypothesisRequest, buildChatEndpoint, callChatCompletion, readSavedSettings } from './lib/ai/index.js';
 import { validateAiConfig } from './features/settings/index.js';
 import { applyTaskResolutions, diagnosticToIssuePayload, diagnosticToTaskPayload } from './lib/associations/index.js';
@@ -322,6 +322,27 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
   }, [filteredImportedRows, importedAnalysis]);
   const importedCategories = useMemo(() => [...new Set(importedAnalysis.rows.map((row) => row.category).filter(Boolean))], [importedAnalysis]);
   const importedTrend = useMemo(() => buildTrendSeries(filteredImportedRows), [filteredImportedRows]);
+  const importedFingerprint = useMemo(() => {
+    const allHeaders = (importedFiles ?? []).flatMap((file) => (file?.sheets ?? []).flatMap((sheet) => sheet?.headers ?? []));
+    return fingerprintColumns(allHeaders);
+  }, [importedFiles]);
+  const recalledRef = useRef('');
+  useEffect(() => {
+    if (!importedFingerprint || recalledRef.current === importedFingerprint) return;
+    recalledRef.current = importedFingerprint;
+    if (Object.keys(manualMapping ?? {}).length > 0) return;
+    const remembered = loadRememberedMapping(null, importedFingerprint);
+    if (remembered) {
+      setManualMapping(remembered);
+      setNotice('已按列结构自动套用上次保存的字段映射，可在 STEP 04 调整。');
+    }
+  }, [importedFingerprint, manualMapping]);
+  useEffect(() => {
+    if (dataMode !== 'imported' || !importedFingerprint) return;
+    if (Object.keys(manualMapping ?? {}).length === 0) return;
+    if ((importedAnalysis?.rows?.length ?? 0) === 0) return;
+    rememberMapping(null, importedFingerprint, manualMapping);
+  }, [dataMode, importedFingerprint, manualMapping, importedAnalysis]);
   const importedTrendPoints = useMemo(() => buildSparklinePoints(importedTrend.map((point) => point.value), { width: 240, height: 48 }), [importedTrend]);
   const setManualField = (target, source) => setManualMapping((current) => applyManualMapping(current, target, source));
   // 异常诊断 → 任务/供应商问题（PRD §8 确认策略闭环）。
