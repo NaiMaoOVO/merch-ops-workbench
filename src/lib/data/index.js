@@ -369,6 +369,37 @@ function parseCsv(text, options = {}) {
 
 export const readSpreadsheet = parseSpreadsheet;
 
+/* ==================== 增量合并（P0：同商品+日期去重累加） ==================== */
+
+/**
+ * 合并重复行：同 productId+date 视为同一条，数值字段累加，其余字段取首个非空值。
+ * 无法构成合并键（缺商品或日期）的行原样保留。返回 { rows, mergedCount }。
+ */
+export function mergeDuplicateRows(rows, options = {}) {
+  const keyField = options.keyField ?? 'productId';
+  const dateField = options.dateField ?? 'date';
+  const additiveFields = options.additiveFields ?? ['impressions', 'clicks', 'orders', 'paid', 'addToCart', 'salesAmount', 'revenue'];
+  const source = Array.isArray(rows) ? rows : [];
+  const output = [];
+  const indexByKey = new Map();
+  let mergedCount = 0;
+  for (const row of source) {
+    const keyValue = String(row?.[keyField] ?? '').trim();
+    const dateValue = row?.[dateField] != null ? String(row[dateField]).trim() : '';
+    const mapKey = keyValue && dateValue ? keyValue + '|' + dateValue : null;
+    if (!mapKey || !indexByKey.has(mapKey)) {
+      output.push({ ...row });
+      if (mapKey) indexByKey.set(mapKey, output.length - 1);
+      continue;
+    }
+    mergedCount += 1;
+    const target = output[indexByKey.get(mapKey)];
+    for (const field of additiveFields) {
+      target[field] = (Number(target[field]) || 0) + (Number(row?.[field]) || 0);
+    }
+  }
+  return { rows: output, mergedCount };
+}
 /* ==================== 映射记忆（P0：同结构文件自动套用上次映射） ==================== */
 
 const MAPPING_MEMORY_PREFIX = 'merch-workbench:mapping-memory:';

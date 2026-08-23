@@ -310,7 +310,14 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
   const preview = useMemo(() => previewTable({ headers, rows }, { limit: 6 }), [headers, rows]);
   const quality = useMemo(() => checkDataQuality({ headers, rows }, { key: table?.primaryKey }), [headers, rows, table?.primaryKey]);
   const mapping = useMemo(() => suggestFieldMappings(table?.columns?.map((column) => column.label) ?? [], ['productId', 'salesAmount', 'category', 'supplier']), [table]);
-  const importedAnalysis = useMemo(() => dataMode === 'imported' ? buildImportedAnalysis(importedFiles, { manualMapping }) : { rows: [], reason: '' }, [dataMode, importedFiles, manualMapping]);
+  const [incrementalMerge, setIncrementalMerge] = useState(true);
+  const importedAnalysisBase = useMemo(() => dataMode === 'imported' ? buildImportedAnalysis(importedFiles, { manualMapping }) : { rows: [], reason: '' }, [dataMode, importedFiles, manualMapping]);
+  const importedAnalysis = useMemo(() => {
+    if (!incrementalMerge) return importedAnalysisBase;
+    if ((importedAnalysisBase.rows?.length ?? 0) === 0) return importedAnalysisBase;
+    const merged = mergeDuplicateRows(importedAnalysisBase.rows);
+    return { ...importedAnalysisBase, rows: merged.rows, mergedCount: merged.mergedCount };
+  }, [incrementalMerge, importedAnalysisBase]);
   // PRD §8.6 扩展：日期/品类筛选 + 明确口径的指标汇总与环比。
   const [analysisFilters, setAnalysisFilters] = useState({ dateFrom: '', dateTo: '', category: '' });
   const filteredImportedRows = useMemo(() => filterAnalysisRows(importedAnalysis.rows, analysisFilters), [importedAnalysis, analysisFilters]);
@@ -655,7 +662,8 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
                 {importedCategories.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
             </label>
-            <span style={{ color: '#96707f' }}>当前 {filteredImportedRows.length} / {importedAnalysis.rows.length} 行</span>
+            <label className="history-toggle" title="同商品同日期的重复行自动累加，避免多份日报重叠统计"><input type="checkbox" checked={incrementalMerge} onChange={(event) => setIncrementalMerge(event.target.checked)} />增量合并</label>
+            <span style={{ color: '#96707f' }}>当前 {filteredImportedRows.length} / {importedAnalysis.rows.length} 行{importedAnalysis.mergedCount > 0 ? ` · 已合并 ${importedAnalysis.mergedCount} 条重复` : ''}</span>
             <button className="text-button" onClick={() => setAnalysisFilters({ dateFrom: '', dateTo: '', category: '' })}>清除筛选</button>
           </div>
           {importedComparison.length > 0 && (
