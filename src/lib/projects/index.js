@@ -152,3 +152,5 @@ export function formatBytes(bytes) {
   if (size >= 1024) return Math.round(size / 1024) + ' KB';
   return size + ' B';
 }
+
+export { applyBackup, collectBackup, summariseBackup, validateBackup, BACKUP_SCHEMA_VERSION } from './backup.js';
