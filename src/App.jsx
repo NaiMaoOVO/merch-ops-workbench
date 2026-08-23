@@ -40,8 +40,9 @@ import { validateAiConfig } from './features/settings/index.js';
 import { diagnosticToIssuePayload, diagnosticToTaskPayload } from './lib/associations/index.js';
 import { createAnalysisProject, estimateProjectBytes, findLatestAnalysisProject, formatBytes, removeAnalysisProject, saveAnalysisProject, saveAnalysisSummary } from './lib/projects/index.js';
 import { buildAnalysisSnapshot } from './lib/projects/index.js';
-import { computeDerivedMetrics, computePeriodComparison, createRule, evaluateRules, filterAnalysisRows } from './lib/analysis/metrics.js';
+import { buildTrendSeries, computeDerivedMetrics, computePeriodComparison, createRule, evaluateRules, filterAnalysisRows } from './lib/analysis/metrics.js';
 import { aggregateTrafficWithSales, buildDiagnostic, buildImportedAnalysis, detectAnomalies } from './lib/analysis/index.js';
+import { buildSparklinePoints } from './lib/analysis/sparkline.js';
 import { buildFunnel, buildPivot } from './lib/analysis/pivot.js';
 import { exportReportWorkbook } from './lib/export/index.js';
 import { exerciseTasks, quickStartTutorial, sampleFixtureBundle, sampleTables } from './lib/fixtures/index';
@@ -318,6 +319,8 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
     return computePeriodComparison(filteredImportedRows.filter((row) => row.date === dates[dates.length - 1]), filteredImportedRows.filter((row) => row.date === dates[0]), ['salesAmount', 'paid', 'impressions', 'clicks']);
   }, [filteredImportedRows, importedAnalysis]);
   const importedCategories = useMemo(() => [...new Set(importedAnalysis.rows.map((row) => row.category).filter(Boolean))], [importedAnalysis]);
+  const importedTrend = useMemo(() => buildTrendSeries(filteredImportedRows), [filteredImportedRows]);
+  const importedTrendPoints = useMemo(() => buildSparklinePoints(importedTrend.map((point) => point.value), { width: 240, height: 48 }), [importedTrend]);
   const setManualField = (target, source) => setManualMapping((current) => applyManualMapping(current, target, source));
   // 异常诊断 → 任务/供应商问题（PRD §8 确认策略闭环）。
   const [convertedDiagnostics, setConvertedDiagnostics] = useState([]);
@@ -637,6 +640,14 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
               {importedComparison.map((item) => (
                 <span key={item.metric} className="soft-status">{item.metric}：{item.previous.toLocaleString()} → {item.current.toLocaleString()}（{item.changeLabel}）</span>
               ))}
+            </div>
+          )}
+          {importedTrend.length > 1 && importedTrendPoints && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 12, color: '#5f4d59', marginBottom: 4 }}>销售额趋势（按日期，共 {importedTrend.length} 天）</div>
+              <svg viewBox="0 0 240 48" width="100%" height="48" role="img" aria-label="销售额趋势折线图">
+                <polyline points={importedTrendPoints} fill="none" stroke="#b36587" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+              </svg>
             </div>
           )}
         </section>
