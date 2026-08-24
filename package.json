@@ -21,7 +21,9 @@
     "dev": "vite --host 127.0.0.1 --port 5174 --strictPort",
     "build": "vite build",
     "test": "node --test",
-    "check": "npm run test && npm run build"
+    "check": "npm run test && npm run build",
+    "build:single": "BUILD_SINGLE=1 vite build",
+    "pack:portable": "BUILD_SINGLE=1 vite build && node scripts/pack-portable.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.1.0",
@@ -32,6 +34,7 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
-    "fake-indexeddb": "^6.2.5"
+    "fake-indexeddb": "^6.2.5",
+    "vite-plugin-singlefile": "^2.3.3"
   }
 }

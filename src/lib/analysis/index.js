@@ -110,10 +110,17 @@ export function aggregateTrafficWithSales(trafficRows, salesRows, options = {}) 
 }
 
 /** 今日概览：最近数据日环比 + 异常 Top3 + 今日到期/逾期任务数。 */
-export function buildTodayBrief({ trend = [], diagnostics = [], tasks = [], now = new Date() } = {}) {
+export function buildTodayBrief({ trend = [], diagnostics = [], tasks = [], now = new Date(), compareMode = 'prev' } = {}) {
   const series = (Array.isArray(trend) ? trend : []).filter((point) => point?.date != null && point.date !== '');
   const last = series[series.length - 1] ?? null;
-  const prev = series[series.length - 2] ?? null;
+  let prev = series[series.length - 2] ?? null;
+  if (compareMode === 'lastWeekSame' && last?.date) {
+    const base = new Date(last.date + 'T12:00:00');
+    base.setDate(base.getDate() - 7);
+    const pad = (v) => String(v).padStart(2, '0');
+    const target = base.getFullYear() + '-' + pad(base.getMonth() + 1) + '-' + pad(base.getDate());
+    prev = series.find((point) => point.date === target) ?? null;
+  }
   const changePct = last && prev && Number(prev.value) > 0
     ? Math.round(((Number(last.value) - Number(prev.value)) / Number(prev.value)) * 1000) / 10
     : null;
@@ -133,5 +140,15 @@ export function buildTodayBrief({ trend = [], diagnostics = [], tasks = [], now 
     topIssues,
     dueToday: openTasks.filter((task) => task.dueDate === todayStr).length,
     overdue: openTasks.filter((task) => task.dueDate && task.dueDate < todayStr).length,
+    staleDays: daysSinceLastImport(series, now),
   };
+}
+
+/** 数据健康度：距最近一次导入过去多少天（0=昨天有数据；null=无数据）。 */
+export function daysSinceLastImport(trend, now = new Date()) {
+  const series = (Array.isArray(trend) ? trend : []).filter((point) => point?.date);
+  if (series.length === 0) return null;
+  const lastMs = Date.parse(String(series[series.length - 1].date) + 'T12:00:00');
+  if (!Number.isFinite(lastMs)) return null;
+  return Math.max(0, Math.floor((now.getTime() - lastMs) / (24 * 60 * 60 * 1000)) - 1);
 }

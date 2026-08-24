@@ -41,7 +41,7 @@ import { applyTaskResolutions, diagnosticToIssuePayload, diagnosticToTaskPayload
 import { createAnalysisProject, estimateProjectBytes, findLatestAnalysisProject, formatBytes, removeAnalysisProject, saveAnalysisProject, saveAnalysisSummary } from './lib/projects/index.js';
 import { buildAnalysisSnapshot } from './lib/projects/index.js';
 import { buildTrendSeries, computeDerivedMetrics, computePeriodComparison, createRule, evaluateRules, filterAnalysisRows } from './lib/analysis/metrics.js';
-import { aggregateTrafficWithSales, buildDiagnostic, buildImportedAnalysis, buildTodayBrief, detectAnomalies } from './lib/analysis/index.js';
+import { aggregateTrafficWithSales, buildDiagnostic, buildImportedAnalysis, buildTodayBrief, daysSinceLastImport, detectAnomalies } from './lib/analysis/index.js';
 import { enableAndSendDailyNotification, queryNotifyPermission } from './lib/notify/index.js';
 import { getMonthlyTarget, monthProgress, setMonthlyTarget } from './lib/goals/index.js';
 import { buildSparklinePoints } from './lib/analysis/sparkline.js';
@@ -179,7 +179,15 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
   ];
   const resolvedDiagnosticCount = applyTaskResolutions(summary?.diagnostics ?? [], savedTasks).filter((item) => item.status === '已解决').length;
   const openDiagnosticCount = summary ? Math.max((summary.diagnostics?.length ?? 0) - resolvedDiagnosticCount, 0) : null;
-  const todayBrief = buildTodayBrief({ trend: summary?.trend ?? [], diagnostics: summary?.diagnostics ?? [], tasks: savedTasks });
+  const [compareMode, setCompareMode] = useState(() => {
+    try { return JSON.parse(window.localStorage.getItem('merch-workbench:prefs') ?? '{}').baseline ?? 'prev'; } catch { return 'prev'; }
+  });
+  const switchCompareMode = () => {
+    const next = compareMode === 'prev' ? 'lastWeekSame' : 'prev';
+    setCompareMode(next);
+    try { window.localStorage.setItem('merch-workbench:prefs', JSON.stringify({ baseline: next })); } catch {}
+  };
+  const todayBrief = buildTodayBrief({ trend: summary?.trend ?? [], diagnostics: summary?.diagnostics ?? [], tasks: savedTasks, compareMode });
   const [notifyState, setNotifyState] = useState(() => queryNotifyPermission());
   const notifySentRef = useRef(false);
   useEffect(() => {
@@ -224,10 +232,12 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
         <section className="glass-card" style={{ padding: '12px 18px', marginBottom: 16 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
             <strong style={{ fontSize: 14 }}>今日概览</strong>
-            {todayBrief.yesterdayValue != null && <span className="soft-status">最近数据日 {todayBrief.date}：销售额 {todayBrief.yesterdayValue.toLocaleString()}{todayBrief.changePct != null ? `（环比 ${todayBrief.changePct > 0 ? '+' : ''}${todayBrief.changePct}%）` : ''}</span>}
+            {todayBrief.yesterdayValue != null && <button className="text-button" onClick={switchCompareMode} title="切换环比对比基线">对比：{compareMode === 'lastWeekSame' ? '上周同日' : '前一日'} ⇄</button>}
+            {todayBrief.yesterdayValue != null && <span className="soft-status">最近数据日 {todayBrief.date}：销售额 {todayBrief.yesterdayValue.toLocaleString()}{todayBrief.changePct != null ? `（对比${compareMode === 'lastWeekSame' ? '上周同日' : '前一日'} ${todayBrief.changePct > 0 ? '+' : ''}${todayBrief.changePct}%）` : ''}</span>}
             {todayBrief.topIssues.map((item) => <span key={item.finding} className="soft-status">⚠ {item.finding}（{item.priority}）</span>)}
             {todayBrief.dueToday > 0 && <span className="priority-tag">今日到期任务 {todayBrief.dueToday}</span>}
             {todayBrief.overdue > 0 && <span className="priority-tag">逾期 {todayBrief.overdue}</span>}
+            {todayBrief.staleDays != null && todayBrief.staleDays >= 2 && <span className="priority-tag">已 {todayBrief.staleDays} 天未导入数据</span>}
             {notifyState === 'default' && <button className="text-button" onClick={requestNotifications}>开启桌面提醒</button>}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginTop: 10 }}>
