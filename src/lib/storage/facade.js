@@ -75,7 +75,21 @@ export function createStorageFacade({ indexedDBFactory = globalThis.indexedDB, l
       return result.sort();
     }
   }
-  return { get, set, remove, keys };
+  async function getMeta(key) {
+    try {
+      const db = await getDb();
+      return await idbGet(db, 'meta', key);
+    } catch {
+      return null;
+    }
+  }
+  async function setMeta(key, value) {
+    try {
+      const db = await getDb();
+      await idbSet(db, 'meta', key, String(value));
+    } catch { /* meta 写失败仅影响水位/统计 */ }
+  }
+  return { get, set, remove, keys, getMeta, setMeta };
 }
 
 export const storageFacade = createStorageFacade();
