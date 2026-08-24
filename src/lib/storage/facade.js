@@ -1,4 +1,7 @@
 import { idbAllKeys, idbDelete, idbGet, idbSet, openDatabase } from './idb.js';
+import { migrateLocalStorageToIdb } from './migrator.js';
+
+const MIRROR_MAX_LENGTH = 8192;
 
 /**
  * 异步存储门面：优先 IndexedDB，任何失败回退 localStorage，保证功能不缩水。
@@ -6,11 +9,28 @@ import { idbAllKeys, idbDelete, idbGet, idbSet, openDatabase } from './idb.js';
  */
 export function createStorageFacade({ indexedDBFactory = globalThis.indexedDB, localStorageImpl = globalThis.localStorage } = {}) {
   let dbPromise = null;
+  let migrationStarted = false;
   function getDb() {
     if (!dbPromise) dbPromise = openDatabase({ indexedDBFactory });
     return dbPromise;
   }
+  async function ensureMigrated() {
+    if (migrationStarted || !localStorageImpl || !indexedDBFactory) return;
+    migrationStarted = true;
+    try {
+      const db = await getDb();
+      await migrateLocalStorageToIdb({ db, localStorageImpl });
+    } catch { /* 迁移失败不阻塞读写，走降级路径 */ }
+  }
+  function mirrorToLocalStorage(key, value) {
+    try {
+      if (String(value).length <= MIRROR_MAX_LENGTH && key.startsWith('merch-workbench:')) {
+        localStorageImpl?.setItem?.(key, String(value));
+      }
+    } catch { /* 镜像失败不影响主路径 */ }
+  }
   async function get(key) {
+    await ensureMigrated();
     try {
       const db = await getDb();
       const record = await idbGet(db, 'kv', key);
@@ -20,22 +40,27 @@ export function createStorageFacade({ indexedDBFactory = globalThis.indexedDB, l
     }
   }
   async function set(key, value) {
+    await ensureMigrated();
     try {
       const db = await getDb();
       await idbSet(db, 'kv', key, String(value));
+      mirrorToLocalStorage(key, value);
     } catch {
       localStorageImpl?.setItem?.(key, String(value));
     }
   }
   async function remove(key) {
+    await ensureMigrated();
     try {
       const db = await getDb();
       await idbDelete(db, 'kv', key);
     } catch {
       localStorageImpl?.removeItem?.(key);
     }
+    try { localStorageImpl?.removeItem?.(key); } catch { /* 镜像清理尽力而为 */ }
   }
   async function keys(prefix = '') {
+    await ensureMigrated();
     try {
       const db = await getDb();
       return await idbAllKeys(db, 'kv', prefix);
