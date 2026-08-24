@@ -1,5 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './lib/storage/install.js';
+import { ready as storageReady } from './lib/storage/install.js';
 import App from './App.jsx';
 import './styles.css';
 
@@ -30,8 +32,10 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
+storageReady.then(() => {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AppErrorBoundary><App /></AppErrorBoundary>
   </React.StrictMode>,
 );
+});
