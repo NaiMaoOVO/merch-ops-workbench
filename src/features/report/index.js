@@ -115,3 +115,36 @@ export function downloadMarkdownReport(markdown, filename = '商品经营分析�
   URL.revokeObjectURL(url);
   return true;
 }
+
+/* ==================== 报告模板库 ==================== */
+
+export const REPORT_TEMPLATES_KEY = 'merch-workbench:report-templates';
+export const REPORT_TEMPLATES_LIMIT = 30;
+
+function templateStorage(storage = typeof window !== 'undefined' ? window.localStorage : null) { return storage; }
+
+/** 读取已保存的报告模板（自动过滤坏条目）。 */
+export function loadReportTemplates(storage = templateStorage()) {
+  try {
+    const parsed = JSON.parse(storage?.getItem(REPORT_TEMPLATES_KEY) ?? '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item) => item && typeof item.name === 'string' && Array.isArray(item.modules));
+  } catch {
+    return [];
+  }
+}
+
+/** 保存模板列表（超出上限淘汰最旧），返回实际写入条数。 */
+export function saveReportTemplates(storage, templates) {
+  const store = templateStorage(storage);
+  const list = (Array.isArray(templates) ? templates : []).slice(-REPORT_TEMPLATES_LIMIT);
+  store?.setItem(REPORT_TEMPLATES_KEY, JSON.stringify(list));
+  return list.length;
+}
+
+/** 由名称与当前模块结构构造模板对象。 */
+export function buildReportTemplate(name, modules) {
+  if (!name || !Array.isArray(modules) || modules.length === 0) throw new Error('模板名称与模块结构不能为空');
+  return { id: 'tpl-' + Date.now(), name: String(name), savedAt: new Date().toISOString(), modules: JSON.parse(JSON.stringify(modules)) };
+}
+

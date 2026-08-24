@@ -2,10 +2,14 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Download, Eye, EyeOff, FileCode2, FileSpreadsheet, FileType2, Printer, Redo2, ShieldCheck, Sparkles, Undo2 } from 'lucide-react';
 import { useEditHistory } from '../../lib/undo/useEditHistory.js';
 import {
+  buildReportTemplate,
   createReportDraft,
   downloadMarkdownReport,
+  loadReportTemplates,
   renderReportMarkdown,
   reorderReportModules,
+  REPORT_TEMPLATES_KEY,
+  saveReportTemplates,
   setReportModuleVisibility,
   updateReportText,
 } from './index.js';
@@ -57,6 +61,32 @@ export default function ReportWorkspace({ report, onChange }) {
   const { value: draft, commit: commitHistory, undo, redo, canUndo, canRedo, restoredDraft, clearDraft, reset } = useEditHistory(createReportDraft(report), { storageKey: reportDraftKey });
   const [check, setCheck] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
+  const [templates, setTemplates] = useState(() => loadReportTemplates());
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const persistTemplates = (list) => { saveReportTemplates(null, list); setTemplates(loadReportTemplates()); };
+  const saveAsTemplate = () => {
+    const name = window.prompt('模板名称：', '我的周报结构');
+    if (!name) return;
+    try {
+      const template = buildReportTemplate(name, draft.modules);
+      persistTemplates([...loadReportTemplates(), template]);
+      setSelectedTemplateId(template.id);
+      setStatusMessage('已保存模板「' + name + '」，任意报告都可套用。');
+    } catch (error) { setStatusMessage('保存失败：' + error.message); }
+  };
+  const applySelectedTemplate = () => {
+    const tpl = templates.find((item) => item.id === selectedTemplateId);
+    if (!tpl) { setStatusMessage('请先在下拉框选择一个模板。'); return; }
+    commit({ ...draft, modules: JSON.parse(JSON.stringify(tpl.modules)) }, '套用模板 ' + tpl.name);
+    setStatusMessage('已套用模板「' + tpl.name + '」。');
+  };
+  const deleteSelectedTemplate = () => {
+    const tpl = templates.find((item) => item.id === selectedTemplateId);
+    if (!tpl || !window.confirm('删除模板「' + tpl.name + '」？')) return;
+    persistTemplates(templates.filter((item) => item.id !== selectedTemplateId));
+    setSelectedTemplateId('');
+    setStatusMessage('已删除模板「' + tpl.name + '」。');
+  };
   const markdown = useMemo(() => renderReportMarkdown(draft), [draft]);
   const html = useMemo(() => renderReportHtml({ markdown, period: draft.period }), [markdown, draft.period]);
   const commit = (next, label) => { commitHistory(next, label); onChange?.(next); };
@@ -126,6 +156,13 @@ export default function ReportWorkspace({ report, onChange }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <button className="icon-button" aria-label="撤销上一步" title={canUndo ? '撤销' : '没有可撤销的步骤'} disabled={!canUndo} onClick={undo} data-testid="report-undo"><Undo2 size={15} /></button>
               <button className="icon-button" aria-label="重做" title={canRedo ? '重做' : '没有可重做的步骤'} disabled={!canRedo} onClick={redo} data-testid="report-redo"><Redo2 size={15} /></button>
+              <button className="text-button" onClick={saveAsTemplate}>存为模板</button>
+              <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)} aria-label="选择报告模板" style={{ maxWidth: 150 }}>
+                <option value="">套用模板…</option>
+                {templates.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+              {selectedTemplateId && <button className="text-button" onClick={applySelectedTemplate}>应用</button>}
+              {selectedTemplateId && <button className="text-button" onClick={deleteSelectedTemplate}>删除</button>}
               <span className="soft-status">可编辑草稿</span>
             </div>
           </div>
