@@ -58,6 +58,7 @@ import TutorialCenter from './features/tutorial/TutorialCenter.jsx';
 import ReportWorkspace from './features/report/ReportWorkspace.jsx';
 import IssueWorkspace from './features/issues/IssueWorkspace.jsx';
 import TaskWorkspace from './features/tasks/TaskWorkspace.jsx';
+import ProductDrilldown from './features/analysis/ProductDrilldown.jsx';
 import CommandPalette from './features/palette/CommandPalette.jsx';
 import HistoryWorkspace from './features/history/HistoryWorkspace.jsx';
 import TrendWorkspace from './features/trends/TrendWorkspace.jsx';
@@ -786,13 +787,7 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
         </section>
       )}
 
-      {productDrilldown && (
-        <section className="panel-card glass-card" data-testid="product-drilldown">
-          <div className="panel-heading"><div><span className="section-kicker">PRODUCT DETAIL</span><h2>商品 {selectedProductId} 详情</h2></div><button className="text-button" onClick={() => setSelectedProductId('')}>返回分析列表</button></div>
-          <div className="metrics-grid" style={{ marginTop: 10 }}><div className="metric-card"><strong>{productDrilldown.totals.impressions.toLocaleString()}</strong><span>曝光量</span></div><div className="metric-card"><strong>{productDrilldown.totals.clicks.toLocaleString()}</strong><span>点击量</span></div><div className="metric-card"><strong>{productDrilldown.totals.paid.toLocaleString()}</strong><span>支付件数</span></div><div className="metric-card"><strong>¥{productDrilldown.totals.salesAmount.toLocaleString()}</strong><span>销售额</span></div></div>
-          <p className="panel-help">已按当前筛选日期汇总 {productDrilldown.rows.length} 条明细，可继续在下方查看异常与趋势。</p>
-        </section>
-      )}
+      {productDrilldown && <ProductDrilldown productId={selectedProductId} totals={productDrilldown.totals} rowCount={productDrilldown.rows.length} onClose={() => setSelectedProductId('')} />}
 
       {dataMode === 'imported' && importedAnalysis.rows.length > 0 && (
         <section className="panel-card glass-card" style={{ padding: '12px 16px', marginBottom: 12 }} data-testid="analysis-filters">
