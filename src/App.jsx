@@ -53,6 +53,7 @@ import TutorialCenter from './features/tutorial/TutorialCenter.jsx';
 import ReportWorkspace from './features/report/ReportWorkspace.jsx';
 import IssueWorkspace from './features/issues/IssueWorkspace.jsx';
 import TaskWorkspace from './features/tasks/TaskWorkspace.jsx';
+import CommandPalette from './features/palette/CommandPalette.jsx';
 import HistoryWorkspace from './features/history/HistoryWorkspace.jsx';
 import TrendWorkspace from './features/trends/TrendWorkspace.jsx';
 import TemplateCenter from './features/templates/TemplateCenter.jsx';
@@ -923,6 +924,32 @@ function TutorialPage({ onNavigate }) {
 function ReportPage() {
   // 报告绑定当前项目：优先使用最近分析项目的名称/周期，明确数据来源。
   const project = (() => { try { return findLatestAnalysisProject(window.localStorage); } catch { return null; } })();
+  const paletteItems = (() => {
+    const pages = ['首页', '商品数据分析', '标题优化', '热点与选品', '供应商问题', '日常任务', '周报与报告', '历史项目', '模板中心', '教程与帮助', '设置与数据管理'];
+    const pageItems = pages.map((page) => ({ id: 'page-' + page, label: page, hint: '页面', keywords: 'page goto ' + page, action: () => setActive(page) }));
+    const taskItems = savedTasks.map((task) => ({
+      id: 'task-' + (task.id ?? task.title),
+      label: task.title || '未命名任务',
+      hint: '任务 · ' + (task.status ?? ''),
+      keywords: 'task renwu ' + (task.category ?? '') + ' ' + (task.projectId ?? ''),
+      action: () => setActive('日常任务'),
+    }));
+    const issueItems = savedIssues.map((issue) => ({
+      id: 'issue-' + (issue.id ?? issue.title),
+      label: issue.title || issue.finding || '供应商问题',
+      hint: '供应商问题 · ' + (issue.status ?? ''),
+      keywords: 'issue gongyingshang',
+      action: () => setActive('供应商问题'),
+    }));
+    const diagItems = (project?.analysisSummary?.diagnostics ?? []).map((item, index) => ({
+      id: 'diag-' + (item.id ?? index),
+      label: item.finding || ('异常 #' + (index + 1)),
+      hint: '诊断 · ' + (item.priority ?? '中'),
+      keywords: 'diagnostic yichang ' + (item.productId ?? ''),
+      action: () => setActive('商品数据分析'),
+    }));
+    return [...pageItems, ...taskItems, ...issueItems, ...diagItems];
+  })();
   // 报告诊断优先取项目里保存的真实分析摘要；没有项目数据时才回退示例演示。
   const summaryDiagnostics = project?.analysisSummary?.diagnostics;
   const diagnostics = summaryDiagnostics?.length
@@ -965,6 +992,17 @@ function SettingsPage({ tasks, issues, templates }) {
 export default function App() {
   const [active, setActive] = useState('首页');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useEffect(() => {
+    const handler = (event) => {
+      if ((event.metaKey || event.ctrlKey) && String(event.key).toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen((current) => !current);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
   const [savedTasks, setSavedTasks] = useState(() => {
     try { return JSON.parse(window.localStorage.getItem('merch-workbench:tasks') || '[]'); } catch { return []; }
   });
@@ -1033,6 +1071,7 @@ export default function App() {
         </header>
         <ErrorBoundary>{active === '首页' ? <Dashboard onNavigate={setActive} savedTasks={savedTasks} savedIssues={savedIssues} /> : active === '商品数据分析' ? <AnalysisWorkspace onAddTask={(task) => updateTasks([{ ...task, source: 'manual' }, ...savedTasks])} onAddIssue={(issue) => updateIssues([{ ...issue }, ...savedIssues])} /> : active === '标题优化' ? <TitlePage /> : active === '热点与选品' ? <TrendsPage notes={savedNotes} onChange={updateNotes} /> : active === '供应商问题' ? <IssuesPage issues={savedIssues} onChange={updateIssues} /> : active === '日常任务' ? <TasksPage tasks={savedTasks} issues={savedIssues} onChange={updateTasks} /> : active === '周报与报告' ? <ReportPage /> : active === '历史项目' ? <HistoryWorkspace storage={window.localStorage} /> : active === '模板中心' ? <TemplatesPage templates={savedTemplates} onChange={updateTemplates} /> : active === '教程与帮助' ? <TutorialPage onNavigate={setActive} /> : active === '设置与数据管理' ? <SettingsPage tasks={savedTasks} issues={savedIssues} templates={savedTemplates} /> : <ModulePlaceholder title={active} onHome={() => setActive('首页')} />}</ErrorBoundary>
       </div>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={paletteItems} />
     </div>
   );
 }
