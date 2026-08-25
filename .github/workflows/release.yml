@@ -1,0 +1,47 @@
+name: Release Portable
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm config set cache .npm-cache
+          npm install --no-audit --no-fund
+
+      - name: Run checks
+        run: npm run check
+
+      - name: Build portable package (with Node installers)
+        run: npm run pack:portable
+        env:
+          # 打包脚本会从 nodejs.org 下载安装包；CI 网络可用
+          WITH_NODE: '1'
+
+      - name: Rename artifact with version
+        run: |
+          VERSION="${GITHUB_REF_NAME:-v0.1.0}"
+          cp "release/海外商品运营工作台-一键使用包.zip" "release/海外商品运营工作台-一键使用包-${VERSION}.zip"
+
+      - name: Create release and upload zip
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.zip
+          generate_release_notes: true
+          make_latest: true

@@ -76,7 +76,12 @@ git push -u origin main        # CI 会自动运行 npm run check
 
 # 日常同步
 git add -A && git commit -m "feat: ..." && git push
+
+# 发布一键使用包到 GitHub Releases（自动构建 + 上传附件）
+git tag v0.1.0 && git push origin v0.1.0
 ```
+
+打 `v*` 标签后，GitHub Actions 会自动：跑完整检查 → 构建单文件版 → 下载 Node.js 官方安装包并打包 → 把 zip 挂到 Releases 页。也可以在 Actions 页手动触发（workflow_dispatch）。
 
 文档同步约定：功能更新时同步修改 `docs/SOP.md` 与飞书 wiki 教程页。
 
