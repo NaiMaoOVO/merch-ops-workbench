@@ -567,6 +567,14 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
   const diagnostics = useMemo(() => anomalyRows.map((anomaly) => buildDiagnostic(anomaly)), [anomalyRows]);
   // PRD §16：AI 只生成「辅助假设」；发送前必须展示脱敏预览并手动放行。
   const [aiAssist, setAiAssist] = useState({ status: 'idle', message: '', preview: null, request: null, result: '' });
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const productDrilldownRows = useMemo(() => filteredImportedRows.filter((row) => String(row.productId ?? '') === String(selectedProductId)), [filteredImportedRows, selectedProductId]);
+  const productDrilldown = useMemo(() => {
+    if (!selectedProductId) return null;
+    const totals = productDrilldownRows.reduce((acc, row) => ({ impressions: acc.impressions + (Number(row.impressions) || 0), clicks: acc.clicks + (Number(row.clicks) || 0), paid: acc.paid + (Number(row.paid) || 0), salesAmount: acc.salesAmount + (Number(row.salesAmount) || 0) }), { impressions: 0, clicks: 0, paid: 0, salesAmount: 0 });
+    const byDate = Object.values(productDrilldownRows.reduce((acc, row) => { const date = String(row.date ?? '未设置'); acc[date] = (acc[date] || 0) + (Number(row.salesAmount) || 0); return acc; }, {}));
+    return { totals, byDate, rows: productDrilldownRows };
+  }, [productDrilldownRows, selectedProductId]);
   const [projectFormOpen, setProjectFormOpen] = useState(false);
   const [projectDraft, setProjectDraft] = useState({ name: '', periodStart: '', periodEnd: '', site: 'US', categoryRange: '' });
   const [projectNotice, setProjectNotice] = useState('');
@@ -778,6 +786,14 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
         </section>
       )}
 
+      {productDrilldown && (
+        <section className="panel-card glass-card" data-testid="product-drilldown">
+          <div className="panel-heading"><div><span className="section-kicker">PRODUCT DETAIL</span><h2>商品 {selectedProductId} 详情</h2></div><button className="text-button" onClick={() => setSelectedProductId('')}>返回分析列表</button></div>
+          <div className="metrics-grid" style={{ marginTop: 10 }}><div className="metric-card"><strong>{productDrilldown.totals.impressions.toLocaleString()}</strong><span>曝光量</span></div><div className="metric-card"><strong>{productDrilldown.totals.clicks.toLocaleString()}</strong><span>点击量</span></div><div className="metric-card"><strong>{productDrilldown.totals.paid.toLocaleString()}</strong><span>支付件数</span></div><div className="metric-card"><strong>¥{productDrilldown.totals.salesAmount.toLocaleString()}</strong><span>销售额</span></div></div>
+          <p className="panel-help">已按当前筛选日期汇总 {productDrilldown.rows.length} 条明细，可继续在下方查看异常与趋势。</p>
+        </section>
+      )}
+
       {dataMode === 'imported' && importedAnalysis.rows.length > 0 && (
         <section className="panel-card glass-card" style={{ padding: '12px 16px', marginBottom: 12 }} data-testid="analysis-filters">
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, fontSize: 12 }}>
@@ -903,6 +919,7 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
           </div>
         )}{diagnostics.length ? <div className="diagnostic-list">{diagnostics.map((item) => <article className="diagnostic-row" key={item.id}><div className="diagnostic-top"><strong>{item.finding}</strong><span className="priority-tag">{item.priority}</span></div><p>证据：曝光 {item.evidence.values.impressions.toLocaleString()}，点击率 {(item.evidence.values.clickRate * 100).toFixed(2)}%，转化率 {(item.evidence.values.conversionRate * 100).toFixed(2)}%</p><small>{item.suggestedAction}</small>{loaded && (
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            {item.productId && <button className="text-button" onClick={() => setSelectedProductId(item.productId)}>查看商品详情</button>}
             <button className="text-button" disabled={convertedDiagnostics.includes(item.id + ':task')} onClick={() => convertToTask(item)}>{convertedDiagnostics.includes(item.id + ':task') ? '已加入任务' : '转日常任务'}</button>
             <button className="text-button" disabled={convertedDiagnostics.includes(item.id + ':issue')} onClick={() => convertToIssue(item, item.productId)}>{convertedDiagnostics.includes(item.id + ':issue') ? '已加入问题' : '转供应商问题'}</button>
           </div>
@@ -967,32 +984,6 @@ function TutorialPage({ onNavigate }) {
 function ReportPage() {
   // 报告绑定当前项目：优先使用最近分析项目的名称/周期，明确数据来源。
   const project = (() => { try { return findLatestAnalysisProject(window.localStorage); } catch { return null; } })();
-  const paletteItems = (() => {
-    const pages = ['首页', '商品数据分析', '标题优化', '热点与选品', '供应商问题', '日常任务', '周报与报告', '历史项目', '模板中心', '教程与帮助', '设置与数据管理'];
-    const pageItems = pages.map((page) => ({ id: 'page-' + page, label: page, hint: '页面', keywords: 'page goto ' + page, action: () => setActive(page) }));
-    const taskItems = savedTasks.map((task) => ({
-      id: 'task-' + (task.id ?? task.title),
-      label: task.title || '未命名任务',
-      hint: '任务 · ' + (task.status ?? ''),
-      keywords: 'task renwu ' + (task.category ?? '') + ' ' + (task.projectId ?? ''),
-      action: () => setActive('日常任务'),
-    }));
-    const issueItems = savedIssues.map((issue) => ({
-      id: 'issue-' + (issue.id ?? issue.title),
-      label: issue.title || issue.finding || '供应商问题',
-      hint: '供应商问题 · ' + (issue.status ?? ''),
-      keywords: 'issue gongyingshang',
-      action: () => setActive('供应商问题'),
-    }));
-    const diagItems = (project?.analysisSummary?.diagnostics ?? []).map((item, index) => ({
-      id: 'diag-' + (item.id ?? index),
-      label: item.finding || ('异常 #' + (index + 1)),
-      hint: '诊断 · ' + (item.priority ?? '中'),
-      keywords: 'diagnostic yichang ' + (item.productId ?? ''),
-      action: () => setActive('商品数据分析'),
-    }));
-    return [...pageItems, ...taskItems, ...issueItems, ...diagItems];
-  })();
   // 报告诊断优先取项目里保存的真实分析摘要；没有项目数据时才回退示例演示。
   const summaryDiagnostics = project?.analysisSummary?.diagnostics;
   const diagnostics = summaryDiagnostics?.length
@@ -1040,6 +1031,13 @@ export default function App() {
   useEffect(() => { document.documentElement.dataset.theme = theme; try { window.localStorage.setItem('merch-workbench:theme', theme); } catch {} }, [theme]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const paletteItems = (() => {
+    const pages = navigation.map((item) => item.label);
+    const pageItems = pages.map((page) => ({ id: 'page-' + page, label: page, hint: '页面', keywords: page, action: () => setActive(page) }));
+    const taskItems = savedTasks.map((task) => ({ id: 'task-' + (task.id ?? task.title), label: task.title || '未命名任务', hint: '任务 · ' + (task.status ?? ''), keywords: task.category ?? '', action: () => setActive('日常任务') }));
+    const issueItems = savedIssues.map((issue) => ({ id: 'issue-' + (issue.id ?? issue.title), label: issue.title || issue.finding || '供应商问题', hint: '问题 · ' + (issue.status ?? ''), keywords: '供应商问题', action: () => setActive('供应商问题') }));
+    return [...pageItems, ...taskItems, ...issueItems];
+  })();
   useEffect(() => {
     const handler = (event) => {
       if ((event.metaKey || event.ctrlKey) && String(event.key).toLowerCase() === 'k') {
