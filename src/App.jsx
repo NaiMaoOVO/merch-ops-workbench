@@ -44,7 +44,8 @@ import { buildTrendSeries, computeDerivedMetrics, computePeriodComparison, creat
 import { aggregateTrafficWithSales, buildDiagnostic, buildImportedAnalysis, buildTodayBrief, daysSinceLastImport, detectAnomalies } from './lib/analysis/index.js';
 import { enableAndSendDailyNotification, queryNotifyPermission } from './lib/notify/index.js';
 import { getMonthlyTarget, monthProgress, setMonthlyTarget } from './lib/goals/index.js';
-import { buildSparklinePoints } from './lib/analysis/sparkline.js';
+import { buildSparklineGeometry, buildSparklinePoints } from './lib/analysis/sparkline.js';
+import { loadAnnotations, saveAnnotations, upsertAnnotation } from './lib/storage/annotations.js';
 import { buildFunnel, buildPivot } from './lib/analysis/pivot.js';
 import { exportReportWorkbook } from './lib/export/index.js';
 import { exerciseTasks, quickStartTutorial, sampleFixtureBundle, sampleTables } from './lib/fixtures/index';
@@ -435,6 +436,21 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
     rememberMapping(null, importedFingerprint, manualMapping);
   }, [dataMode, importedFingerprint, manualMapping, importedAnalysis]);
   const importedTrendPoints = useMemo(() => buildSparklinePoints(importedTrend.map((point) => point.value), { width: 240, height: 48 }), [importedTrend]);
+  const [annotations, setAnnotations] = useState(() => loadAnnotations());
+  const [annotationDraft, setAnnotationDraft] = useState({ date: '', label: '' });
+  const commitAnnotation = () => {
+    if (!annotationDraft.date || !annotationDraft.label.trim()) return;
+    const next = upsertAnnotation(annotations, annotationDraft.date, annotationDraft.label);
+    setAnnotations(next);
+    saveAnnotations(next);
+    setAnnotationDraft({ date: '', label: '' });
+    setNotice('已保存事件标注，趋势图上会出现标记点。');
+  };
+  const removeAnnotation = (date) => {
+    const next = upsertAnnotation(annotations, date, '');
+    setAnnotations(next);
+    saveAnnotations(next);
+  };
   const exportTrendPng = () => {
     const svg = document.getElementById('analysis-trend-svg');
     if (!svg) { setNotice('未找到趋势图，请先导入数据。'); return; }
@@ -786,9 +802,31 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
                 <span>销售额趋势（按日期，共 {importedTrend.length} 天）</span>
                 <button className="text-button" onClick={exportTrendPng}>存为图片</button>
               </div>
-              <svg id="analysis-trend-svg" viewBox="0 0 240 48" width="100%" height="48" role="img" aria-label="销售额趋势折线图">
-                <polyline points={importedTrendPoints} fill="none" stroke="#b36587" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-              </svg>
+              {(() => {
+                const geometry = buildSparklineGeometry(importedTrend.map((point) => point.value), { width: 240, height: 48 });
+                return (
+                  <svg id="analysis-trend-svg" viewBox="0 0 240 48" width="100%" height="48" role="img" aria-label="销售额趋势折线图">
+                    <polyline points={importedTrendPoints} fill="none" stroke="#b36587" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                    {geometry.map((point) => {
+                      const info = importedTrend[point.index];
+                      const label = annotations[info?.date];
+                      return label ? <circle key={info.date} cx={point.x} cy={point.y} r={3.5} fill="#3a9d6d"><title>{info.date} · {label}</title></circle> : null;
+                    })}
+                  </svg>
+                );
+              })()}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 8 }}>
+                <input type="date" value={annotationDraft.date} onChange={(event) => setAnnotationDraft({ ...annotationDraft, date: event.target.value })} style={{ fontSize: 12 }} />
+                <input type="text" placeholder="事件标签，如：大促 / 断货" value={annotationDraft.label} onChange={(event) => setAnnotationDraft({ ...annotationDraft, label: event.target.value })} onKeyDown={(event) => event.key === 'Enter' && commitAnnotation()} style={{ flex: '1 1 140px', fontSize: 12 }} />
+                <button className="text-button" onClick={commitAnnotation}>添加标注</button>
+              </div>
+              {Object.keys(annotations).length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                  {Object.entries(annotations).map(([date, label]) => (
+                    <span key={date} className="soft-status">{date} · {label}<button className="text-button" aria-label={'删除标注' + date} onClick={() => removeAnnotation(date)} style={{ marginLeft: 4 }}>✕</button></span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>
