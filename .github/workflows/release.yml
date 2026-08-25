@@ -37,7 +37,7 @@ jobs:
       - name: Rename artifact with version
         run: |
           VERSION="${GITHUB_REF_NAME:-v0.1.0}"
-          cp "release/海外商品运营工作台-一键使用包.zip" "release/海外商品运营工作台-一键使用包-${VERSION}.zip"
+          cp "release/海外商品运营工作台-一键使用包.zip" "release/merch-ops-workbench-portable-${VERSION}.zip"
 
       - name: Create release and upload zip
         uses: softprops/action-gh-release@v2
