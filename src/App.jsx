@@ -36,7 +36,7 @@ import {
   Truck,
   Upload,
 } from 'lucide-react';
-import { applyManualMapping, chainJoins, checkDataQuality, fingerprintColumns, loadRememberedMapping, matchTables, parseSpreadsheet, previewTable, rememberMapping, suggestFieldMappings, suggestJoinKeys } from './lib/data/index.js';
+import { applyManualMapping, chainJoins, checkDataQuality, fingerprintColumns, loadRememberedMapping, matchTables, mergeDuplicateRows, parseSpreadsheet, previewTable, rememberMapping, suggestFieldMappings, suggestJoinKeys } from './lib/data/index.js';
 import { buildAnomalyHypothesisRequest, buildChatEndpoint, callChatCompletion, readSavedSettings } from './lib/ai/index.js';
 import { validateAiConfig } from './features/settings/index.js';
 import { applyTaskResolutions, diagnosticToIssuePayload, diagnosticToTaskPayload } from './lib/associations/index.js';
