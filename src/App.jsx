@@ -193,7 +193,7 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
   useEffect(() => {
     if (notifyState !== 'granted' || notifySentRef.current) return;
     notifySentRef.current = true;
-    enableAndSendDailyNotification({ overdueTasks: todayBrief.overdue, dueTodayTasks: todayBrief.dueToday, highRiskDiagnostics: (summary?.diagnostics ?? []).filter((item) => item.priority === '高' && item.status !== '已解决').length });
+    enableAndSendDailyNotification({ overdueTasks: todayBrief.overdue, dueTodayTasks: todayBrief.dueToday, highRiskDiagnostics: (summary?.diagnostics ?? []).filter((item) => item.priority === '高' && item.status !== '已解决').length, weeklyNudge: new Date().getDay() === 1 && (summary?.diagnostics?.length ?? 0) > 0 });
   }, [notifyState]);
   const projectId = project?.id ?? '';
   const [monthlyTarget, setTargetState] = useState(() => getMonthlyTarget(null, projectId));
@@ -201,7 +201,7 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
   const targetProgress = monthProgress({ trend: summary?.trend ?? [], target: monthlyTarget });
   const commitMonthlyTarget = (value) => { setMonthlyTarget(null, projectId, value); setTargetState(Math.max(0, Number(value) || 0)); };
   const requestNotifications = async () => {
-    const sent = await enableAndSendDailyNotification({ overdueTasks: todayBrief.overdue, dueTodayTasks: todayBrief.dueToday, highRiskDiagnostics: (summary?.diagnostics ?? []).filter((item) => item.priority === '高' && item.status !== '已解决').length });
+    const sent = await enableAndSendDailyNotification({ overdueTasks: todayBrief.overdue, dueTodayTasks: todayBrief.dueToday, highRiskDiagnostics: (summary?.diagnostics ?? []).filter((item) => item.priority === '高' && item.status !== '已解决').length, weeklyNudge: new Date().getDay() === 1 && (summary?.diagnostics?.length ?? 0) > 0 });
     setNotifyState(queryNotifyPermission());
     if (!sent) setNotifyState((current) => current);
   };
@@ -407,6 +407,28 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
     rememberMapping(null, importedFingerprint, manualMapping);
   }, [dataMode, importedFingerprint, manualMapping, importedAnalysis]);
   const importedTrendPoints = useMemo(() => buildSparklinePoints(importedTrend.map((point) => point.value), { width: 240, height: 48 }), [importedTrend]);
+  const exportTrendPng = () => {
+    const svg = document.getElementById('analysis-trend-svg');
+    if (!svg) { setNotice('未找到趋势图，请先导入数据。'); return; }
+    const xml = new XMLSerializer().serializeToString(svg);
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 960;
+      canvas.height = 192;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const link = document.createElement('a');
+      link.download = '销售额趋势.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      setNotice('趋势图已导出为 PNG。');
+    };
+    image.onerror = () => setNotice('导出失败：浏览器不支持该操作。');
+    image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+  };
   const setManualField = (target, source) => setManualMapping((current) => applyManualMapping(current, target, source));
   // 异常诊断 → 任务/供应商问题（PRD §8 确认策略闭环）。
   const [convertedDiagnostics, setConvertedDiagnostics] = useState([]);
@@ -732,8 +754,11 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
           )}
           {importedTrend.length > 1 && importedTrendPoints && (
             <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 12, color: '#5f4d59', marginBottom: 4 }}>销售额趋势（按日期，共 {importedTrend.length} 天）</div>
-              <svg viewBox="0 0 240 48" width="100%" height="48" role="img" aria-label="销售额趋势折线图">
+              <div style={{ fontSize: 12, color: '#5f4d59', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>销售额趋势（按日期，共 {importedTrend.length} 天）</span>
+                <button className="text-button" onClick={exportTrendPng}>存为图片</button>
+              </div>
+              <svg id="analysis-trend-svg" viewBox="0 0 240 48" width="100%" height="48" role="img" aria-label="销售额趋势折线图">
                 <polyline points={importedTrendPoints} fill="none" stroke="#b36587" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
               </svg>
             </div>

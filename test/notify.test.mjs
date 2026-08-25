@@ -14,6 +14,14 @@ test('无事发生返回 null；仅有待处理问题时兜底提醒', () => {
   assert.equal(buildDailyNotification({ overdueTasks: -5 }), null);
 });
 
+test('周一写报提醒：即使没有待办也会触发并置顶', () => {
+  const brief = buildDailyNotification({ weeklyNudge: true });
+  assert.ok(brief.body.startsWith('上周数据已就绪'));
+  const mixed = buildDailyNotification({ weeklyNudge: true, overdueTasks: 2 });
+  assert.equal(mixed.body, '上周数据已就绪，该写周报了 · 逾期任务 2');
+  assert.equal(buildDailyNotification({ weeklyNudge: false }), null);
+});
+
 test('权限探测在无 Notification 环境安全降级', () => {
   assert.equal(queryNotifyPermission(null), 'unsupported');
   assert.equal(queryNotifyPermission({ permission: 'granted', requestPermission: () => {} }), 'granted');
