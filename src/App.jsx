@@ -171,14 +171,14 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
   const latestProject = (() => { try { return findLatestAnalysisProject(window.localStorage); } catch { return null; } })();
   const summary = latestProject?.analysisSummary;
   const totals = summary?.totals;
+  const resolvedDiagnosticCount = applyTaskResolutions(summary?.diagnostics ?? [], savedTasks).filter((item) => item.status === '已解决').length;
+  const openDiagnosticCount = summary ? Math.max((summary.diagnostics?.length ?? 0) - resolvedDiagnosticCount, 0) : null;
   const dashboardMetrics = [
     { label: '销售额', value: totals ? `¥ ${Math.round(totals.salesAmount).toLocaleString()}` : null, trend: totals ? `${summary.rowCount} 行导入明细` : '导入数据后生成', icon: TrendingUp, tone: 'pink' },
     { label: '曝光量', value: totals ? totals.impressions.toLocaleString() : null, trend: totals ? `${totals.clicks.toLocaleString()} 次点击` : '导入后生成', icon: CloudSun, tone: 'purple' },
     { label: '点击率', value: totals ? `${(totals.clickRate * 100).toFixed(2)}%` : null, trend: totals ? `支付 ${totals.paid.toLocaleString()} 件` : '导入后生成', icon: PackageSearch, tone: 'blue' },
     { label: '待确认异常', value: openDiagnosticCount == null ? null : String(openDiagnosticCount), trend: openDiagnosticCount == null ? '分析后生成' : (openDiagnosticCount === 0 && (summary?.diagnostics?.length ?? 0) > 0 ? '已全部解决 ✓' : ((summary?.diagnostics ?? []).some((item) => item.priority === '高') ? '含高优先级' : '暂无高优先级')), icon: AlertTriangle, tone: 'orange' },
   ];
-  const resolvedDiagnosticCount = applyTaskResolutions(summary?.diagnostics ?? [], savedTasks).filter((item) => item.status === '已解决').length;
-  const openDiagnosticCount = summary ? Math.max((summary.diagnostics?.length ?? 0) - resolvedDiagnosticCount, 0) : null;
   const [compareMode, setCompareMode] = useState(() => {
     try { return JSON.parse(window.localStorage.getItem('merch-workbench:prefs') ?? '{}').baseline ?? 'prev'; } catch { return 'prev'; }
   });
@@ -186,6 +186,17 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
     const next = compareMode === 'prev' ? 'lastWeekSame' : 'prev';
     setCompareMode(next);
     try { window.localStorage.setItem('merch-workbench:prefs', JSON.stringify({ baseline: next })); } catch {}
+  };
+  const [metricsPanelOpen, setMetricsPanelOpen] = useState(false);
+  const [hiddenMetricLabels, setHiddenMetricLabels] = useState(() => {
+    try { return JSON.parse(window.localStorage.getItem('merch-workbench:prefs') ?? '{}').hiddenMetrics ?? []; } catch { return []; }
+  });
+  const persistHiddenMetrics = (list) => {
+    setHiddenMetricLabels(list);
+    try {
+      const prefs = JSON.parse(window.localStorage.getItem('merch-workbench:prefs') ?? '{}');
+      window.localStorage.setItem('merch-workbench:prefs', JSON.stringify({ ...prefs, hiddenMetrics: list }));
+    } catch { /* 只读环境忽略 */ }
   };
   const todayBrief = buildTodayBrief({ trend: summary?.trend ?? [], diagnostics: summary?.diagnostics ?? [], tasks: savedTasks, compareMode });
   const [notifyState, setNotifyState] = useState(() => queryNotifyPermission());
@@ -259,10 +270,26 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
       <section aria-labelledby="metric-title">
         <div className="section-heading">
           <div><span className="section-kicker">THIS WEEK</span><h2 id="metric-title">本周数据概览</h2></div>
-          <button className="text-button">自定义指标 <Settings size={15} /></button>
+          <button className="text-button" onClick={() => setMetricsPanelOpen((open) => !open)}>自定义指标 <Settings size={15} /></button>
         </div>
+        {metricsPanelOpen && (
+          <div className="glass-card" style={{ padding: '10px 14px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: '#96707f' }}>选择要展示的指标：</span>
+            {dashboardMetrics.map((item) => (
+              <label key={item.label} className="history-toggle">
+                <input
+                  type="checkbox"
+                  checked={!hiddenMetricLabels.includes(item.label)}
+                  onChange={() => persistHiddenMetrics(hiddenMetricLabels.includes(item.label) ? hiddenMetricLabels.filter((label) => label !== item.label) : [...hiddenMetricLabels, item.label])}
+                />
+                {item.label}
+              </label>
+            ))}
+            {hiddenMetricLabels.length > 0 && <button className="text-button" onClick={() => persistHiddenMetrics([])}>全部显示</button>}
+          </div>
+        )}
         <div className="metrics-grid">
-          {dashboardMetrics.map((item) => <MetricCard item={item} key={item.label} />)}
+          {dashboardMetrics.filter((item) => !hiddenMetricLabels.includes(item.label)).map((item) => <MetricCard item={item} key={item.label} />)}
         </div>
       </section>
 
