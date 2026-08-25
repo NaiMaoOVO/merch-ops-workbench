@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { buildChatEndpoint, buildWeeklyDigestRequest, callChatCompletion, parseWeeklyDigest, readSavedSettings } from '../../lib/ai/index.js';
+import { validateAiConfig } from '../settings/index.js';
 import { ChevronDown, ChevronUp, Download, Eye, EyeOff, FileCode2, FileSpreadsheet, FileType2, Printer, Redo2, ShieldCheck, Sparkles, Undo2 } from 'lucide-react';
 import { useEditHistory } from '../../lib/undo/useEditHistory.js';
 import {
@@ -61,6 +63,30 @@ export default function ReportWorkspace({ report, onChange }) {
   const { value: draft, commit: commitHistory, undo, redo, canUndo, canRedo, restoredDraft, clearDraft, reset } = useEditHistory(createReportDraft(report), { storageKey: reportDraftKey });
   const [check, setCheck] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
+  const [aiDigest, setAiDigest] = useState({ status: 'idle', request: null, preview: null });
+  const prepareAiDigest = () => {
+    const settings = readSavedSettings();
+    const config = settings.ai ?? {};
+    const checkConfig = validateAiConfig(config);
+    if (!checkConfig.valid) { setAiDigest({ status: 'error', request: null, preview: null }); setStatusMessage('尚未配置可用的 AI 接口：' + checkConfig.errors.join('；')); return; }
+    const request = buildWeeklyDigestRequest({ totals: report?.totals, comparison: report?.comparison, annotations: report?.annotations, period: draft.period });
+    setAiDigest({ status: 'preview', request, preview: { endpoint: buildChatEndpoint(config.baseUrl), model: config.model, fields: request.preview.fields.join('、'), sensitiveFieldsExcluded: true } });
+    setStatusMessage('AI 摘要请求已生成，请确认脱敏预览后发送。');
+  };
+  const confirmAiDigest = async () => {
+    if (aiDigest.status !== 'preview' || !aiDigest.request) return;
+    setAiDigest((current) => ({ ...current, status: 'loading' }));
+    try {
+      const config = readSavedSettings().ai ?? {};
+      const reply = await callChatCompletion(config, { messages: aiDigest.request.messages, maxTokens: 320, timeoutMs: 40000 });
+      const text = parseWeeklyDigest(reply);
+      const module = { id: 'ai-digest', kind: 'text', title: 'AI 执行摘要（待审核）', visible: true, text };
+      const modules = draft.modules.some((item) => item.id === module.id) ? draft.modules.map((item) => item.id === module.id ? { ...item, ...module } : item) : [...draft.modules, module];
+      commit({ ...draft, modules }, '生成 AI 执行摘要');
+      setAiDigest({ status: 'done', request: null, preview: null });
+      setStatusMessage('AI 执行摘要已加入报告，内容仍需人工审核。');
+    } catch (error) { setAiDigest({ status: 'error', request: null, preview: null }); setStatusMessage('AI 摘要失败：' + error.message); }
+  };
   const [templates, setTemplates] = useState(() => loadReportTemplates());
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const persistTemplates = (list) => { saveReportTemplates(null, list); setTemplates(loadReportTemplates()); };
@@ -134,6 +160,13 @@ export default function ReportWorkspace({ report, onChange }) {
         </div>
       </section>
 
+      {aiDigest.preview && (
+        <section className="notice-box glass-card" role="status" data-testid="ai-digest-preview">
+          <ShieldCheck size={16} />
+          <div><strong>AI 执行摘要发送预览</strong><small style={{ display: 'block', marginTop: 4 }}>接口：{aiDigest.preview.endpoint} · 模型：{aiDigest.preview.model} · 字段：{aiDigest.preview.fields} · 不发送原始明细</small></div>
+        </section>
+      )}
+
       {check && (
         <section className="notice-box glass-card" role="status" data-testid="report-preflight" style={{ alignItems: 'flex-start' }}>
           <ShieldCheck size={16} />
@@ -157,6 +190,8 @@ export default function ReportWorkspace({ report, onChange }) {
               <button className="icon-button" aria-label="撤销上一步" title={canUndo ? '撤销' : '没有可撤销的步骤'} disabled={!canUndo} onClick={undo} data-testid="report-undo"><Undo2 size={15} /></button>
               <button className="icon-button" aria-label="重做" title={canRedo ? '重做' : '没有可重做的步骤'} disabled={!canRedo} onClick={redo} data-testid="report-redo"><Redo2 size={15} /></button>
               <button className="text-button" onClick={saveAsTemplate}>存为模板</button>
+              <button className="text-button" onClick={prepareAiDigest}><Sparkles size={14} />AI 执行摘要</button>
+              {aiDigest.status === 'preview' && <button className="text-button" onClick={confirmAiDigest}>确认发送脱敏数据</button>}
               <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)} aria-label="选择报告模板" style={{ maxWidth: 150 }}>
                 <option value="">套用模板…</option>
                 {templates.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}

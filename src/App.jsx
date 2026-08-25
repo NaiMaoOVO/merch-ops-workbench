@@ -1003,6 +1003,7 @@ function ReportPage() {
     period: project?.period && project.period !== '未设置' ? project.period : sampleFixtureBundle.period.label,
     dataSource: project ? `本地项目「${project.name}」· ${project.dataSources?.length ?? 0} 个导入工作表` : '内置示例数据',
     projectId: project?.id,
+    totals: project?.analysisSummary?.totals ?? {},
     comparison: summaryDiagnostics ? (project?.analysisSummary?.comparison ?? []) : [],
     diagnostics: diagnostics.map((item) => ({ ...item, evidence: `曝光 ${item.evidence.values.impressions.toLocaleString()}，点击率 ${(item.evidence.values.clickRate * 100).toFixed(2)}%`, hypothesis: item.hypothesis })),
   };

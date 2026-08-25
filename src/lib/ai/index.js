@@ -148,6 +148,31 @@ export function buildAnomalyHypothesisRequest(anomalies, options = {}) {
     };
 }
 
+export const WEEKLY_DIGEST_SYSTEM_PROMPT = '你是跨境电商运营周报助手。基于脱敏的汇总数据输出 3 条可执行摘要，每条不超过 45 字；只描述数据与建议，不编造原因；每条以「待审核摘要：」开头。';
+
+/** 构建周报摘要请求：仅包含汇总指标、周期对比和用户事件标签。 */
+export function buildWeeklyDigestRequest({ totals = {}, comparison = [], annotations = [], period = '本周期' } = {}) {
+    const safeTotals = Object.fromEntries(Object.entries(totals ?? {}).filter(([, value]) => Number.isFinite(Number(value))).map(([key, value]) => [key, Number(value)]));
+    const safeComparison = (Array.isArray(comparison) ? comparison : []).filter((item) => item && typeof item.metric === 'string').slice(0, 20).map((item) => ({
+        metric: item.metric,
+        previous: Number(item.previous) || 0,
+        current: Number(item.current) || 0,
+        change: String(item.changeLabel ?? ''),
+    }));
+    const safeAnnotations = (Array.isArray(annotations) ? annotations : []).slice(0, 20).map((item) => ({ date: String(item.date ?? ''), label: String(item.label ?? '').slice(0, 40) })).filter((item) => item.date && item.label);
+    const payload = { period: String(period), totals: safeTotals, comparison: safeComparison, events: safeAnnotations };
+    const messages = [
+        { role: 'system', content: WEEKLY_DIGEST_SYSTEM_PROMPT },
+        { role: 'user', content: '周报脱敏汇总：' + JSON.stringify(payload) + '。请输出 3 条执行摘要。' },
+    ];
+    return { messages, maskedSummary: payload, preview: { fields: ['period', 'totals', 'comparison', 'events'], rowCount: safeComparison.length, sensitiveFieldsExcluded: true } };
+}
+
+/** 解析摘要为可编辑文本，所有结果都必须人工审核。 */
+export function parseWeeklyDigest(text) {
+    return String(text ?? '').split(/\r?\n/).map((line) => line.replace(/^[-*\d.、）)]+\s*/, '').trim()).filter(Boolean).slice(0, 3).map((line) => ('待审核摘要：' + line.replace(/^待审核摘要：/, '')).slice(0, 80)).join('\n');
+}
+
 /* ------------------------------ title candidates -------------------------------- */
 
 /** Shared local-settings reader so every feature sees the same AI config. */
