@@ -401,6 +401,7 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
   const quality = useMemo(() => checkDataQuality({ headers, rows }, { key: table?.primaryKey }), [headers, rows, table?.primaryKey]);
   const mapping = useMemo(() => suggestFieldMappings(table?.columns?.map((column) => column.label) ?? [], ['productId', 'salesAmount', 'category', 'supplier']), [table]);
   const [incrementalMerge, setIncrementalMerge] = useState(true);
+  const [manualMapping, setManualMapping] = useState(() => restoredProject?.snapshot?.fieldMapping ?? {});
   const importedAnalysisBase = useMemo(() => dataMode === 'imported' ? buildImportedAnalysis(importedFiles, { manualMapping }) : { rows: [], reason: '' }, [dataMode, importedFiles, manualMapping]);
   const importedAnalysis = useMemo(() => {
     if (!incrementalMerge) return importedAnalysisBase;
@@ -511,10 +512,10 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
         totals,
         trend: importedTrend,
         comparison: importedComparison,
-        diagnostics,
+        diagnostics: diagnosticsRef.current,
       });
     } catch { /* 只读环境忽略 */ }
-  }, [dataMode, currentProjectId, loaded, diagnostics, filteredImportedRows.length, importedComparison]);
+  }, [dataMode, currentProjectId, loaded, filteredImportedRows.length, importedComparison]);
   const convertToTask = (diagnostic) => {
     onAddTask?.({ ...diagnosticToTaskPayload(diagnostic), source: 'manual' });
     setConvertedDiagnostics((current) => [...new Set([...current, diagnostic.id + ':task'])]);
@@ -566,6 +567,8 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
     return detectAnomalies(trafficRows, { impressionQuantile: 0.7, lowClickRate: 0.035, lowConversionRate: 0.08 }).slice(0, 4);
   }, [loaded, dataMode, filteredImportedRows]);
   const diagnostics = useMemo(() => anomalyRows.map((anomaly) => buildDiagnostic(anomaly)), [anomalyRows]);
+  const diagnosticsRef = useRef(diagnostics);
+  useEffect(() => { diagnosticsRef.current = diagnostics; }, [diagnostics]);
   // PRD §16：AI 只生成「辅助假设」；发送前必须展示脱敏预览并手动放行。
   const [aiAssist, setAiAssist] = useState({ status: 'idle', message: '', preview: null, request: null, result: '' });
   const [selectedProductId, setSelectedProductId] = useState('');
