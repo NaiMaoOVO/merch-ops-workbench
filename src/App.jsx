@@ -1026,13 +1026,6 @@ export default function App() {
   useEffect(() => { document.documentElement.dataset.theme = theme; try { window.localStorage.setItem('merch-workbench:theme', theme); } catch {} }, [theme]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const paletteItems = (() => {
-    const pages = navigation.map((item) => item.label);
-    const pageItems = pages.map((page) => ({ id: 'page-' + page, label: page, hint: '页面', keywords: page, action: () => setActive(page) }));
-    const taskItems = savedTasks.map((task) => ({ id: 'task-' + (task.id ?? task.title), label: task.title || '未命名任务', hint: '任务 · ' + (task.status ?? ''), keywords: task.category ?? '', action: () => setActive('日常任务') }));
-    const issueItems = savedIssues.map((issue) => ({ id: 'issue-' + (issue.id ?? issue.title), label: issue.title || issue.finding || '供应商问题', hint: '问题 · ' + (issue.status ?? ''), keywords: '供应商问题', action: () => setActive('供应商问题') }));
-    return [...pageItems, ...taskItems, ...issueItems];
-  })();
   useEffect(() => {
     const handler = (event) => {
       if ((event.metaKey || event.ctrlKey) && String(event.key).toLowerCase() === 'k') {
@@ -1107,6 +1100,14 @@ export default function App() {
     setSavedTemplates(next);
     window.localStorage.setItem('merch-workbench:templates', JSON.stringify(next));
   }
+
+  const paletteItems = (() => {
+    const pages = navigation.map((item) => item.label);
+    const pageItems = pages.map((page) => ({ id: 'page-' + page, label: page, hint: '页面', keywords: page, action: () => setActive(page) }));
+    const taskItems = savedTasks.map((task) => ({ id: 'task-' + (task.id ?? task.title), label: task.title || '未命名任务', hint: '任务 · ' + (task.status ?? ''), keywords: task.category ?? '', action: () => setActive('日常任务') }));
+    const issueItems = savedIssues.map((issue) => ({ id: 'issue-' + (issue.id ?? issue.title), label: issue.title || issue.finding || '供应商问题', hint: '问题 · ' + (issue.status ?? ''), keywords: '供应商问题', action: () => setActive('供应商问题') }));
+    return [...pageItems, ...taskItems, ...issueItems];
+  })();
 
   return (
     <div className="app-shell">
