@@ -213,7 +213,7 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
     notifySentRef.current = true;
     enableAndSendDailyNotification({ overdueTasks: todayBrief.overdue, dueTodayTasks: todayBrief.dueToday, highRiskDiagnostics: (summary?.diagnostics ?? []).filter((item) => item.priority === '高' && item.status !== '已解决').length, weeklyNudge: new Date().getDay() === 1 && (summary?.diagnostics?.length ?? 0) > 0 });
   }, [notifyState]);
-  const projectId = project?.id ?? '';
+  const projectId = latestProject?.id ?? '';
   const [monthlyTarget, setTargetState] = useState(() => getMonthlyTarget(null, projectId));
   useEffect(() => { setTargetState(getMonthlyTarget(null, projectId)); }, [projectId]);
   const targetProgress = monthProgress({ trend: summary?.trend ?? [], target: monthlyTarget });
@@ -1130,7 +1130,7 @@ export default function App() {
             <div className="avatar">CZ</div>
           </div>
         </header>
-        <ErrorBoundary>{active === '首页' ? <Dashboard onNavigate={setActive} savedTasks={savedTasks} savedIssues={savedIssues} /> : active === '商品数据分析' ? <AnalysisWorkspace onAddTask={(task) => updateTasks([{ ...task, source: 'manual' }, ...savedTasks])} onAddIssue={(issue) => updateIssues([{ ...issue }, ...savedIssues])} /> : active === '标题优化' ? <TitlePage /> : active === '热点与选品' ? <TrendsPage notes={savedNotes} onChange={updateNotes} /> : active === '供应商问题' ? <IssuesPage issues={savedIssues} onChange={updateIssues} /> : active === '日常任务' ? <TasksPage tasks={savedTasks} issues={savedIssues} onChange={updateTasks} /> : active === '周报与报告' ? <ReportPage /> : active === '历史项目' ? <HistoryWorkspace storage={window.localStorage} /> : active === '模板中心' ? <TemplatesPage templates={savedTemplates} onChange={updateTemplates} /> : active === '教程与帮助' ? <TutorialPage onNavigate={setActive} /> : active === '设置与数据管理' ? <SettingsPage tasks={savedTasks} issues={savedIssues} templates={savedTemplates} /> : <ModulePlaceholder title={active} onHome={() => setActive('首页')} />}</ErrorBoundary>
+        <ErrorBoundary key={active}>{active === '首页' ? <Dashboard onNavigate={setActive} savedTasks={savedTasks} savedIssues={savedIssues} /> : active === '商品数据分析' ? <AnalysisWorkspace onAddTask={(task) => updateTasks([{ ...task, source: 'manual' }, ...savedTasks])} onAddIssue={(issue) => updateIssues([{ ...issue }, ...savedIssues])} /> : active === '标题优化' ? <TitlePage /> : active === '热点与选品' ? <TrendsPage notes={savedNotes} onChange={updateNotes} /> : active === '供应商问题' ? <IssuesPage issues={savedIssues} onChange={updateIssues} /> : active === '日常任务' ? <TasksPage tasks={savedTasks} issues={savedIssues} onChange={updateTasks} /> : active === '周报与报告' ? <ReportPage /> : active === '历史项目' ? <HistoryWorkspace storage={window.localStorage} /> : active === '模板中心' ? <TemplatesPage templates={savedTemplates} onChange={updateTemplates} /> : active === '教程与帮助' ? <TutorialPage onNavigate={setActive} /> : active === '设置与数据管理' ? <SettingsPage tasks={savedTasks} issues={savedIssues} templates={savedTemplates} /> : <ModulePlaceholder title={active} onHome={() => setActive('首页')} />}</ErrorBoundary>
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={paletteItems} />
     </div>

@@ -15,6 +15,7 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
+    console.error('Module error:', error, info);
     this.props?.onError?.(error, info);
   }
 
@@ -26,6 +27,7 @@ export default class ErrorBoundary extends Component {
           <span className="eyebrow">MODULE ERROR</span>
           <h1>这个模块遇到了问题</h1>
           <p>本地数据不受影响。可以尝试重新打开该模块；若反复出现，请导出备份后反馈。</p>
+          <code data-testid="module-error-detail" style={{ maxWidth: 'min(700px, 90vw)', whiteSpace: 'pre-wrap', color: '#a33b65' }}>{String(this.state.error?.message ?? this.state.error ?? '未知错误')}</code>
           <button className="primary-button" onClick={() => this.setState({ error: null })}>重新加载模块</button>
         </main>
       );
