@@ -23,9 +23,15 @@ function normalizeDiagnostic(item = {}, index = 0) {
 
 export function createReportDraft(report = {}) {
   const diagnostics = Array.isArray(report.diagnostics) ? report.diagnostics.map(normalizeDiagnostic) : [];
+  const comparison = Array.isArray(report.comparison)
+    ? report.comparison
+      .filter((item) => item && typeof item.metric === 'string')
+      .map((item) => ({ metric: item.metric, previous: Number(item.previous) || 0, current: Number(item.current) || 0, changeLabel: String(item.changeLabel ?? '—') }))
+    : [];
   return {
     id: textValue(report.id, 'report-draft'),
     period: textValue(report.period, '未配置'),
+    comparison,
     modules: [
       {
         id: 'overview',
@@ -99,6 +105,14 @@ export function renderReportMarkdown(draft = {}) {
     } else {
       lines.push(`## ${module.title}`, '', module.text || '待补充', '');
     }
+  }
+  const comparison = Array.isArray(draft.comparison) ? draft.comparison : [];
+  if (comparison.length > 0) {
+    lines.push('## 双周期对比', '', '| 指标 | 上期 | 本期 | 变化 |', '| --- | ---: | ---: | --- |');
+    for (const item of comparison) {
+      lines.push(`| ${item.metric} | ${item.previous.toLocaleString()} | ${item.current.toLocaleString()} | ${item.changeLabel} |`);
+    }
+    lines.push('');
   }
   lines.push('> 本报告由本地规则分析生成；AI 辅助假设需要人工验证。');
   return lines.join('\n').trimEnd();
