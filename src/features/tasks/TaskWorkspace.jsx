@@ -62,7 +62,7 @@ export default function TaskWorkspace({ tasks: initialTasks = [], diagnostics = 
   const [priority, setPriority] = useState('全部');
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', priority: '中', dueDate: today() });
+  const [form, setForm] = useState({ title: '', description: '', priority: '中', dueDate: today(), recurrence: 'none' });
   const now = useMemo(() => new Date(), [tasks]);
   const summary = useMemo(() => summarizeTasks(tasks, now), [tasks, now]);
   const visibleTasks = useMemo(() => sortTasks(filterTasks(tasks, { query, status, priority, overdue: overdueOnly, now }), now), [tasks, query, status, priority, overdueOnly, now]);
@@ -77,7 +77,7 @@ export default function TaskWorkspace({ tasks: initialTasks = [], diagnostics = 
     try {
       const task = createTask(form);
       commit(sortTasks([task, ...tasks], now));
-      setForm({ title: '', description: '', priority: '中', dueDate: today() });
+      setForm({ title: '', description: '', priority: '中', dueDate: today(), recurrence: 'none' });
       setShowForm(false);
     } catch {
       // The required title field provides the visible validation state.
@@ -115,6 +115,7 @@ export default function TaskWorkspace({ tasks: initialTasks = [], diagnostics = 
             <input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="补充说明（可选）" aria-label="任务说明" />
             <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} aria-label="任务优先级"><option>高</option><option>中</option><option>低</option></select>
             <input type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} aria-label="截止日期" />
+            <select value={form.recurrence} onChange={(event) => setForm({ ...form, recurrence: event.target.value })} aria-label="重复规则"><option value="none">不重复</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option></select>
             <button className="secondary-button" type="submit"><Check size={15} />添加</button>
           </form>
         )}

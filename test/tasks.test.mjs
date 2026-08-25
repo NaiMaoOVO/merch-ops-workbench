@@ -24,6 +24,7 @@ test('creates a normalized task with safe defaults and stable fields', () => {
     status: '待处理',
     dueDate: '2026-08-23',
     category: '日常任务',
+    recurrence: 'none',
     source: 'manual',
     relatedId: null,
     createdAt: NOW,

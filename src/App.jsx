@@ -46,6 +46,8 @@ import { enableAndSendDailyNotification, queryNotifyPermission } from './lib/not
 import { getMonthlyTarget, monthProgress, setMonthlyTarget } from './lib/goals/index.js';
 import { buildSparklineGeometry, buildSparklinePoints } from './lib/analysis/sparkline.js';
 import { loadAnnotations, saveAnnotations, upsertAnnotation } from './lib/storage/annotations.js';
+import { materializeRecurringTasks, shouldRunWeeklyBackup, WEEKLY_BACKUP_META_KEY } from './lib/automation/index.js';
+import { collectBackup as collectFullBackup } from './lib/projects/index.js';
 import { buildFunnel, buildPivot } from './lib/analysis/pivot.js';
 import { exportReportWorkbook } from './lib/export/index.js';
 import { exerciseTasks, quickStartTutorial, sampleFixtureBundle, sampleTables } from './lib/fixtures/index';
@@ -1045,8 +1047,26 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
   const [savedTasks, setSavedTasks] = useState(() => {
-    try { return JSON.parse(window.localStorage.getItem('merch-workbench:tasks') || '[]'); } catch { return []; }
+    try {
+      const stored = JSON.parse(window.localStorage.getItem('merch-workbench:tasks') || '[]');
+      return materializeRecurringTasks(stored);
+    } catch { return []; }
   });
+  useEffect(() => {
+    try {
+      const last = window.localStorage.getItem(WEEKLY_BACKUP_META_KEY);
+      if (!shouldRunWeeklyBackup(last)) return;
+      const snapshot = collectFullBackup(window.localStorage);
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'workbench-weekly-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      link.click();
+      URL.revokeObjectURL(url);
+      window.localStorage.setItem(WEEKLY_BACKUP_META_KEY, new Date().toISOString());
+    } catch { /* 自动备份失败不阻塞工作台 */ }
+  }, []);
   const [savedIssues, setSavedIssues] = useState(() => {
     try {
       const stored = JSON.parse(window.localStorage.getItem('merch-workbench:issues') || '[]');
@@ -1071,8 +1091,9 @@ export default function App() {
 
   function updateTasks(next) {
     const manual = next.filter((item) => !item.source || item.source === 'manual');
-    setSavedTasks(manual);
-    window.localStorage.setItem('merch-workbench:tasks', JSON.stringify(manual));
+    const materialized = materializeRecurringTasks(manual);
+    setSavedTasks(materialized);
+    window.localStorage.setItem('merch-workbench:tasks', JSON.stringify(materialized));
   }
 
   function updateIssues(next) {

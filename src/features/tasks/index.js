@@ -20,6 +20,7 @@ export function createTask(input = {}, options = {}) {
     status: input.status ?? '待处理',
     dueDate: input.dueDate || '',
     category: input.category || '日常任务',
+    recurrence: ['none', 'daily', 'weekly', 'monthly'].includes(input.recurrence) ? input.recurrence : 'none',
     source: input.source || 'manual',
     relatedId: input.relatedId ?? null,
     createdAt: input.createdAt ?? now,
