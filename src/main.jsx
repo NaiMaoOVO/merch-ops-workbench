@@ -4,6 +4,7 @@ import './lib/storage/install.js';
 import { ready as storageReady } from './lib/storage/install.js';
 import App from './App.jsx';
 import './styles.css';
+import './theme.css';
 
 class AppErrorBoundary extends React.Component {
   constructor(props) {

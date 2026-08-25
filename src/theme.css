@@ -1,0 +1,26 @@
+:root[data-theme='dark'] {
+  color: #f4eaf0;
+  background: #211b22;
+  --ink: #f4eaf0;
+  --muted: #c4adb9;
+  --line: rgba(255, 224, 238, 0.16);
+  --glass: rgba(48, 37, 48, 0.82);
+  --shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
+}
+:root[data-theme='dark'] body { background: #211b22; }
+:root[data-theme='dark'] .app-shell { background: linear-gradient(145deg, #211b22 0%, #2b202a 55%, #211f2e 100%); }
+:root[data-theme='dark'] .glass-panel,
+:root[data-theme='dark'] .glass-card { border-color: rgba(255,255,255,.1); background: var(--glass); }
+:root[data-theme='dark'] input,
+:root[data-theme='dark'] select,
+:root[data-theme='dark'] textarea { color: var(--ink); background: rgba(30, 23, 31, .72) !important; border-color: var(--line) !important; }
+:root[data-theme='dark'] .quick-action,
+:root[data-theme='dark'] .task-card,
+:root[data-theme='dark'] .diagnostic-row { background: rgba(255,255,255,.055); }
+@media print {
+  .sidebar, .topbar, .workspace-actions, .history-actions, .tasks-hero button, .text-button, .icon-button, .ambient { display: none !important; }
+  .app-content { margin: 0 !important; padding: 0 !important; }
+  .glass-card, .glass-panel, .panel-card { box-shadow: none !important; border: 1px solid #d9d0d5 !important; background: #fff !important; break-inside: avoid; }
+  body { color: #111 !important; background: #fff !important; }
+  h1, h2, h3, p, span, strong, small { color: #111 !important; }
+}

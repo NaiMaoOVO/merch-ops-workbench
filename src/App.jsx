@@ -28,6 +28,8 @@ import {
   Plus,
   Search,
   Settings,
+  Moon,
+  Sun,
   Sparkles,
   Store,
   TrendingUp,
@@ -1034,6 +1036,8 @@ function SettingsPage({ tasks, issues, templates }) {
 
 export default function App() {
   const [active, setActive] = useState('首页');
+  const [theme, setTheme] = useState(() => { try { return window.localStorage.getItem('merch-workbench:theme') || 'light'; } catch { return 'light'; } });
+  useEffect(() => { document.documentElement.dataset.theme = theme; try { window.localStorage.setItem('merch-workbench:theme', theme); } catch {} }, [theme]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   useEffect(() => {
@@ -1127,6 +1131,7 @@ export default function App() {
             <kbd>⌘ K</kbd>
           </label>
           <div className="topbar-actions">
+            <button className="icon-button" onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} aria-label={theme === 'dark' ? '切换浅色模式' : '切换深色模式'} title={theme === 'dark' ? '浅色模式' : '深色模式'}>{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</button>
             <button className="icon-button notification-button" aria-label={notificationCount > 0 ? `通知：${notificationCount} 项逾期` : '通知'} title={notificationCount > 0 ? `${overdueTaskCount} 项逾期任务 · ${overdueIssueCount} 个逾期供应商问题` : '暂无逾期'}><Bell size={19} />{notificationCount > 0 && <em className="notify-count" style={{ position: 'absolute', top: -4, right: -4, fontSize: 10, fontStyle: 'normal', color: 'white', background: '#e75f91', borderRadius: 9, minWidth: 16, height: 16, display: 'grid', placeItems: 'center' }}>{notificationCount}</em>}{notificationCount === 0 && <span />}</button>
             <div className="avatar">CZ</div>
           </div>
