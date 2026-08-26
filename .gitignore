@@ -33,3 +33,4 @@ pnpm-debug.log*
 
 # Temporary auth artifacts
 feishu-auth-qr.png
+.chrome-*/
