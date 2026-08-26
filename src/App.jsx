@@ -165,9 +165,9 @@ function Sidebar({ active, onSelect, isOpen, onClose, supplierIssueCount = 0 }) 
 function MetricCard({ item }) {
   const Icon = item.icon;
   return (
-    <article className="metric-card glass-card">
+    <article className="metric-card glass-card" title={item.formula ? `口径：${item.formula}` : undefined}>
       <div className={`metric-icon ${item.tone}`}><Icon size={19} /></div>
-      <div className="metric-heading"><span>{item.label}</span><CircleHelp size={14} /></div>
+      <div className="metric-heading"><span>{item.label}</span>{item.formula && <CircleHelp size={14} aria-label={item.formula} />}</div>
       {item.value == null
         ? <strong className="metric-unset">尚未配置</strong>
         : <strong>{item.value}</strong>}
@@ -184,10 +184,10 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [], onCompleteTa
   const resolvedDiagnosticCount = applyTaskResolutions(summary?.diagnostics ?? [], savedTasks).filter((item) => item.status === '已解决').length;
   const openDiagnosticCount = summary ? Math.max((summary.diagnostics?.length ?? 0) - resolvedDiagnosticCount, 0) : null;
   const dashboardMetrics = [
-    { label: '销售额', value: totals ? `¥ ${Math.round(totals.salesAmount).toLocaleString()}` : null, trend: totals ? `${summary.rowCount} 行导入明细` : '导入数据后生成', icon: TrendingUp, tone: 'pink' },
-    { label: '曝光量', value: totals ? totals.impressions.toLocaleString() : null, trend: totals ? `${totals.clicks.toLocaleString()} 次点击` : '导入后生成', icon: CloudSun, tone: 'purple' },
-    { label: '点击率', value: totals ? `${(totals.clickRate * 100).toFixed(2)}%` : null, trend: totals ? `支付 ${totals.paid.toLocaleString()} 件` : '导入后生成', icon: PackageSearch, tone: 'blue' },
-    { label: '待确认异常', value: openDiagnosticCount == null ? null : String(openDiagnosticCount), trend: openDiagnosticCount == null ? '分析后生成' : (openDiagnosticCount === 0 && (summary?.diagnostics?.length ?? 0) > 0 ? '已全部解决 ✓' : ((summary?.diagnostics ?? []).some((item) => item.priority === '高') ? '含高优先级' : '暂无高优先级')), icon: AlertTriangle, tone: 'orange' },
+    { label: '销售额', formula: '各明细行销售额（salesAmount）求和', value: totals ? `¥ ${Math.round(totals.salesAmount).toLocaleString()}` : null, trend: totals ? `${summary.rowCount} 行导入明细` : '导入数据后生成', icon: TrendingUp, tone: 'pink' },
+    { label: '曝光量', formula: '各明细行曝光量（impressions）求和', value: totals ? totals.impressions.toLocaleString() : null, trend: totals ? `${totals.clicks.toLocaleString()} 次点击` : '导入后生成', icon: CloudSun, tone: 'purple' },
+    { label: '点击率', formula: '点击量 ÷ 曝光量 × 100%', value: totals ? `${(totals.clickRate * 100).toFixed(2)}%` : null, trend: totals ? `支付 ${totals.paid.toLocaleString()} 件` : '导入后生成', icon: PackageSearch, tone: 'blue' },
+    { label: '待确认异常', formula: '状态不是「已解决/已忽略」的诊断条数', value: openDiagnosticCount == null ? null : String(openDiagnosticCount), trend: openDiagnosticCount == null ? '分析后生成' : (openDiagnosticCount === 0 && (summary?.diagnostics?.length ?? 0) > 0 ? '已全部解决 ✓' : ((summary?.diagnostics ?? []).some((item) => item.priority === '高') ? '含高优先级' : '暂无高优先级')), icon: AlertTriangle, tone: 'orange' },
   ];
   const [compareMode, setCompareMode] = useState(() => {
     try { return JSON.parse(window.localStorage.getItem('merch-workbench:prefs') ?? '{}').baseline ?? 'prev'; } catch { return 'prev'; }
@@ -557,6 +557,12 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
   // PRD §8.4：真实导入的多表匹配——主表 + 关联表 + 关联键，先预览再使用。
   const [joinPlan, setJoinPlan] = useState(null);
   const importedSheetOptions = importedFiles.map((sheet, index) => ({ id: `imported:${index}`, label: `${sheet.fileName} / ${sheet.name}`, sheet }));
+  const removeImportedSheet = (index) => {
+    const next = importedFiles.filter((_, i) => i !== index);
+    setImportedFiles(next);
+    if (selectedTable === `imported:${index}`) setSelectedTable(next.length ? 'imported:0' : 'sales');
+    setNotice(`已移除第 ${index + 1} 个导入工作表，统计已按剩余数据重算。`);
+  };
   const joinPrimary = importedSheetOptions.find((option) => option.id === joinPlan?.primaryId)?.sheet;
   const joinSecondary = importedSheetOptions.find((option) => option.id === joinPlan?.secondaryId)?.sheet;
   const joinKeySuggestions = useMemo(() => (joinPrimary && joinSecondary ? suggestJoinKeys(joinPrimary.headers ?? [], joinSecondary.headers ?? []) : []), [joinPrimary, joinSecondary]);
@@ -947,7 +953,19 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
               </div>
             )}
           </div>
-        ) : (<div className="empty-state"><Boxes size={26} /><span>{dataMode === 'imported' ? '导入两张以上工作表后，可以选择主表和关联键进行多表匹配预览。' : '载入示例数据会演示 销售 → 商品 → 品类 → 供应商 的连续匹配。'}</span></div>))}<p className="formula-hint">复现公式：<code>=XLOOKUP(A2, 商品表!A:A, 商品表!B:B, "未匹配")</code></p></section>
+          ) : (<div className="empty-state"><Boxes size={26} /><span>{dataMode === 'imported' ? '导入两张以上工作表后，可以选择主表和关联键进行多表匹配预览。' : '载入示例数据会演示 销售 → 商品 → 品类 → 供应商 的连续匹配。'}</span></div>))}
+          {importedFiles.length > 0 && importedSheetOptions.length >= 2 && (
+            <div style={{ marginTop: 10, borderTop: '1px dashed var(--line)', paddingTop: 10, fontSize: 12 }} data-testid="imported-sheet-manager">
+              <strong style={{ marginRight: 8 }}>已导入工作表（{importedFiles.length}）</strong>
+              {importedFiles.map((sheet, index) => (
+                <span key={`sheet-${index}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, margin: '2px 6px 2px 0', padding: '3px 8px', border: '1px solid var(--line)', borderRadius: 999 }}>
+                  <button className="text-button" onClick={() => setSelectedTable(`imported:${index}`)}>{sheet.fileName} / {sheet.name} · {sheet.rows?.length ?? 0} 行</button>
+                  <button className="text-button" aria-label={'移除' + sheet.name} onClick={() => removeImportedSheet(index)} style={{ color: '#b36587' }}>✕</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </section>
         <section className="panel-card glass-card" data-tutorial="diagnosis"><div className="panel-heading"><div><span className="section-kicker">STEP 04</span><h2>字段推荐与预览</h2></div><Sparkles size={18} color="#c45880" /></div><div className="mapping-list">{mapping.map((item) => <div className="mapping-row" key={item.target}><span>{item.target}</span><ArrowRight size={14} /><strong>{item.source ?? '未匹配'}</strong><small>{Math.round(item.confidence * 100)}%</small></div>)}</div><div className="preview-table-wrap"><table><thead><tr>{preview.headers.slice(0, 4).map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{preview.rows.slice(0, 3).map((row, index) => <tr key={index}>{preview.headers.slice(0, 4).map((header) => <td key={header}>{String(row[header] ?? '—')}</td>)}</tr>)}</tbody></table></div>{dataMode === 'imported' && importedHeaders.length > 0 && (
           <div style={{ marginTop: 10, borderTop: '1px dashed var(--line)', paddingTop: 10 }}>
             <div style={{ fontSize: 12, marginBottom: 6 }}><strong>手动字段映射</strong><small style={{ color: '#96707f', marginLeft: 6 }}>留空表示使用自动识别</small></div>
@@ -1098,11 +1116,19 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   useEffect(() => {
+    const pageByGKey = { h: '首页', a: '商品数据分析', t: '日常任务', i: '供应商问题', r: '周报与报告', s: '历史项目', d: '教程与帮助', m: '标题优化', f: '热点与选品', p: '模板中心', z: '设置与数据管理' };
+    let gPending = false;
     const handler = (event) => {
       if ((event.metaKey || event.ctrlKey) && String(event.key).toLowerCase() === 'k') {
         event.preventDefault();
         setPaletteOpen((current) => !current);
+        return;
       }
+      const tag = String(event.target?.tagName ?? '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || event.target?.isContentEditable || event.metaKey || event.ctrlKey || event.altKey) return;
+      const key = String(event.key).toLowerCase();
+      if (gPending && pageByGKey[key]) { event.preventDefault(); gPending = false; setActive(pageByGKey[key]); return; }
+      gPending = key === 'g';
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);

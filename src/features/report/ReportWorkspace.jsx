@@ -66,12 +66,23 @@ export default function ReportWorkspace({ report, onChange }) {
   const [statusMessage, setStatusMessage] = useState('');
   const [aiDigest, setAiDigest] = useState({ status: 'idle', request: null, preview: null });
   const fillLocalDigest = () => {
-    const text = buildLocalDigest({ totals: report?.totals, comparison: report?.comparison, diagnostics: report?.diagnostics ?? [], annotations: report?.annotations ?? {}, period: draft.period });
-    if (!text) { setStatusMessage('暂无分析数据可填充，请先在商品数据分析页导入并运行分析。'); return; }
-    const module = { id: 'local-digest', kind: 'text', title: '数据摘要（本地生成）', visible: true, text };
-    const modules = draft.modules.some((item) => item.id === module.id) ? draft.modules.map((item) => item.id === module.id ? { ...item, ...module } : item) : [...draft.modules, module];
-    commit({ ...draft, modules }, '一键填充数据摘要');
-    setStatusMessage('已用本地规则填充数据摘要，可直接编辑微调。');
+    const digestText = buildLocalDigest({ totals: report?.totals, comparison: report?.comparison, diagnostics: report?.diagnostics ?? [], annotations: report?.annotations ?? {}, period: draft.period });
+    if (!digestText) { setStatusMessage('暂无分析数据可填充，请先在商品数据分析页导入并运行分析。'); return; }
+    const topDiag = (report?.diagnostics ?? []).filter((item) => item.status !== '已解决' && item.status !== '已忽略').slice(0, 3);
+    const overviewLines = [];
+    if (topDiag.length > 0) overviewLines.push('重点待办：' + topDiag.map((item) => `【${item.priority}】${item.finding ?? item.title ?? ''}`).join('；'));
+    const events = Object.entries(report?.annotations ?? {});
+    if (events.length > 0) overviewLines.push('本期事件：' + events.map(([date, label]) => `${date} ${label}`).join('、'));
+    const generatedModules = [
+      { id: 'local-overview', kind: 'text', title: '本期概览（本地生成）', visible: true, text: overviewLines.join('\n') || '本期待办已全部处理。' },
+      { id: 'local-digest', kind: 'text', title: '数据摘要（本地生成）', visible: true, text: digestText },
+    ];
+    let modules = [...draft.modules];
+    for (const gen of generatedModules) {
+      modules = modules.some((item) => item.id === gen.id) ? modules.map((item) => item.id === gen.id ? { ...item, ...gen } : item) : [...modules, gen];
+    }
+    commit({ ...draft, modules }, '一键填充概览与摘要');
+    setStatusMessage('已生成本期概览和数据摘要两个模块，可直接编辑微调。');
   };
   const prepareAiDigest = () => {
     const settings = readSavedSettings();
