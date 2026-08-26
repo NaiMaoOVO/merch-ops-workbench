@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { buildChatEndpoint, buildWeeklyDigestRequest, callChatCompletion, parseWeeklyDigest, readSavedSettings } from '../../lib/ai/index.js';
+import { buildLocalDigest } from '../../lib/analysis/local-digest.js';
 import { validateAiConfig } from '../settings/index.js';
 import { ChevronDown, ChevronUp, Download, Eye, EyeOff, FileCode2, FileSpreadsheet, FileType2, Printer, Redo2, ShieldCheck, Sparkles, Undo2 } from 'lucide-react';
 import { useEditHistory } from '../../lib/undo/useEditHistory.js';
@@ -64,6 +65,14 @@ export default function ReportWorkspace({ report, onChange }) {
   const [check, setCheck] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [aiDigest, setAiDigest] = useState({ status: 'idle', request: null, preview: null });
+  const fillLocalDigest = () => {
+    const text = buildLocalDigest({ totals: report?.totals, comparison: report?.comparison, diagnostics: report?.diagnostics ?? [], annotations: report?.annotations ?? {}, period: draft.period });
+    if (!text) { setStatusMessage('暂无分析数据可填充，请先在商品数据分析页导入并运行分析。'); return; }
+    const module = { id: 'local-digest', kind: 'text', title: '数据摘要（本地生成）', visible: true, text };
+    const modules = draft.modules.some((item) => item.id === module.id) ? draft.modules.map((item) => item.id === module.id ? { ...item, ...module } : item) : [...draft.modules, module];
+    commit({ ...draft, modules }, '一键填充数据摘要');
+    setStatusMessage('已用本地规则填充数据摘要，可直接编辑微调。');
+  };
   const prepareAiDigest = () => {
     const settings = readSavedSettings();
     const config = settings.ai ?? {};
@@ -125,10 +134,15 @@ export default function ReportWorkspace({ report, onChange }) {
     action(result);
   };
 
+  const EXPORT_FORMAT_KEY = 'merch-workbench:prefs';
+  const rememberExportFormat = (format) => { try { const prefs = JSON.parse(window.localStorage.getItem(EXPORT_FORMAT_KEY) ?? '{}'); window.localStorage.setItem(EXPORT_FORMAT_KEY, JSON.stringify({ ...prefs, lastExport: format })); } catch {} };
+  const [lastExport, setLastExport] = useState(() => { try { return JSON.parse(window.localStorage.getItem('merch-workbench:prefs') ?? '{}').lastExport ?? ''; } catch { return ''; } });
+
   function exportExcel() {
     guardExport(async () => {
       try {
         const downloaded = await exportReportWorkbook(buildWorkbookSheets(draft));
+        if (downloaded) { rememberExportFormat('Excel'); setLastExport('Excel'); }
         setStatusMessage(downloaded ? 'Excel 已开始下载。' : '当前环境不支持下载，请在浏览器中使用。');
       } catch (error) {
         setStatusMessage('Excel 导出失败：' + error.message);
@@ -139,6 +153,7 @@ export default function ReportWorkspace({ report, onChange }) {
   function printPdf() {
     guardExport(() => {
       const opened = printReportHtml(html);
+      if (opened) { rememberExportFormat('PDF'); setLastExport('PDF'); }
       setStatusMessage(opened ? '已打开打印窗口：选择"另存为 PDF"即可归档。' : '浏览器拦截了弹窗，请允许弹出窗口后重试。');
     });
   }
@@ -149,10 +164,10 @@ export default function ReportWorkspace({ report, onChange }) {
         <div>
           <span className="eyebrow">REPORT STUDIO · 模块化报告</span>
           <h1>周报与报告</h1>
-          <p>编辑模块、确认 AI 辅助假设，再按需要导出 Markdown、HTML、Word、Excel 或 PDF。</p>
+          <p>编辑模块、确认 AI 辅助假设，再按需要导出 Markdown、HTML、Word、Excel 或 PDF。{lastExport && <small style={{ color: '#96707f', marginLeft: 6 }}>上次导出：{lastExport}</small>}</p>
         </div>
         <div className="workspace-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
-          <button className="primary-button" style={EXPORT_BUTTON_STYLE} onClick={() => downloadMarkdownReport(markdown)}><Download size={15} />Markdown</button>
+          <button className="primary-button" style={EXPORT_BUTTON_STYLE} onClick={() => { rememberExportFormat('Markdown'); setLastExport('Markdown'); downloadMarkdownReport(markdown); }}><Download size={15} />Markdown</button>
           <button className="secondary-button" style={EXPORT_BUTTON_STYLE} onClick={() => guardExport(() => downloadText(html, '商品经营分析报告.html', 'text/html;charset=utf-8'))}><FileCode2 size={15} />HTML</button>
           <button className="secondary-button" style={EXPORT_BUTTON_STYLE} onClick={() => guardExport(() => exportWordDocument(html))}><FileType2 size={15} />Word</button>
           <button className="secondary-button" style={EXPORT_BUTTON_STYLE} onClick={exportExcel}><FileSpreadsheet size={15} />Excel</button>
@@ -190,6 +205,7 @@ export default function ReportWorkspace({ report, onChange }) {
               <button className="icon-button" aria-label="撤销上一步" title={canUndo ? '撤销' : '没有可撤销的步骤'} disabled={!canUndo} onClick={undo} data-testid="report-undo"><Undo2 size={15} /></button>
               <button className="icon-button" aria-label="重做" title={canRedo ? '重做' : '没有可重做的步骤'} disabled={!canRedo} onClick={redo} data-testid="report-redo"><Redo2 size={15} /></button>
               <button className="text-button" onClick={saveAsTemplate}>存为模板</button>
+              <button className="text-button" onClick={fillLocalDigest}>填充数据摘要</button>
               <button className="text-button" onClick={prepareAiDigest}><Sparkles size={14} />AI 执行摘要</button>
               {aiDigest.status === 'preview' && <button className="text-button" onClick={confirmAiDigest}>确认发送脱敏数据</button>}
               <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)} aria-label="选择报告模板" style={{ maxWidth: 150 }}>

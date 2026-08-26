@@ -105,9 +105,11 @@ const tasks = [
 const formInputStyle = { border: '1px solid var(--line)', borderRadius: 9, padding: '7px 9px', background: 'rgba(255,255,255,.72)', width: '100%', boxSizing: 'border-box' };
 
 function getDashboardTasks(savedTasks = [], savedIssues = []) {
-  const taskItems = Array.isArray(savedTasks) ? savedTasks.filter((item) => item.status !== '已完成' && item.status !== '已取消').map((item) => ({ title: item.title, meta: `日常任务 · ${item.dueDate || '未设置截止日期'}`, priority: item.priority || '中', tone: item.priority === '高' ? 'danger' : 'warning' })) : [];
-  const issueItems = Array.isArray(savedIssues) ? savedIssues.filter((item) => item.status !== '已解决' && item.status !== '已关闭').map((item) => ({ title: item.title, meta: `供应商问题 · ${item.dueDate || '未设置截止日期'}`, priority: item.priority || '中', tone: item.priority === '高' ? 'danger' : 'warning' })) : [];
-  return [...taskItems, ...issueItems].slice(0, 4);
+  const today = new Date().toISOString().slice(0, 10);
+  const isDue = (d) => Boolean(d && String(d).slice(0, 10) <= today);
+  const taskItems = Array.isArray(savedTasks) ? savedTasks.filter((item) => item.status !== '已完成' && item.status !== '已取消').map((item) => ({ title: item.title, meta: `日常任务 · ${isDue(item.dueDate) ? (item.dueDate === today ? '今天到期' : '已逾期') + ' · ' : ''}${item.dueDate || '未设置截止日期'}`, priority: item.priority || '中', tone: item.priority === '高' ? 'danger' : 'warning', completeId: item.id, kind: 'task', due: isDue(item.dueDate) ? 0 : 1 })) : [];
+  const issueItems = Array.isArray(savedIssues) ? savedIssues.filter((item) => item.status !== '已解决' && item.status !== '已关闭').map((item) => ({ title: item.title, meta: `供应商问题 · ${isDue(item.dueDate) ? (item.dueDate === today ? '今天到期' : '已逾期') + ' · ' : ''}${item.dueDate || '未设置截止日期'}`, priority: item.priority || '中', tone: item.priority === '高' ? 'danger' : 'warning', completeId: item.id, kind: 'issue', due: isDue(item.dueDate) ? 0 : 1 })) : [];
+  return [...taskItems, ...issueItems].sort((a, b) => a.due - b.due).slice(0, 6);
 }
 
 const quickActions = [
@@ -174,7 +176,7 @@ function MetricCard({ item }) {
   );
 }
 
-function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
+function Dashboard({ onNavigate, savedTasks = [], savedIssues = [], onCompleteTask, onResolveIssue }) {
   // PRD §7.2：首页指标与最近项目使用真实本地数据；缺数据时显示「尚未配置」，不显示虚假 0。
   const latestProject = (() => { try { return findLatestAnalysisProject(window.localStorage); } catch { return null; } })();
   const summary = latestProject?.analysisSummary;
@@ -351,11 +353,14 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
           </div>
           <div className="task-list">
             {(dashboardTasks.length ? dashboardTasks : tasks).map((task) => (
-              <button className="task-row" key={task.title}>
-                <span className="task-check" />
-                <span className="task-copy"><strong>{task.title}</strong><small>{task.meta}</small></span>
+              <div className="task-row" key={task.title} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {task.completeId && (
+                  <button className="text-button" aria-label={'完成' + task.title} onClick={() => task.kind === 'issue' ? onResolveIssue?.(task.completeId) : onCompleteTask?.(task.completeId)} style={{ minWidth: 24 }}>✓</button>
+                )}
+                {!task.completeId && <span className="task-check" />}
+                <span className="task-copy" style={{ flex: 1 }}><strong>{task.title}</strong><small>{task.meta}</small></span>
                 <span className={`tag ${task.tone}`}>{task.priority}</span>
-              </button>
+              </div>
             ))}
           </div>
           <button className="full-text-button">查看全部待办 <ArrowRight size={15} /></button>
@@ -431,7 +436,7 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
     return { ...importedAnalysisBase, rows: merged.rows, mergedCount: merged.mergedCount };
   }, [incrementalMerge, importedAnalysisBase]);
   // PRD §8.6 扩展：日期/品类筛选 + 明确口径的指标汇总与环比。
-  const [analysisFilters, setAnalysisFilters] = useState({ dateFrom: '', dateTo: '', category: '' });
+  const [analysisFilters, setAnalysisFilters] = useState({ dateFrom: '', dateTo: '', category: '', productId: '' });
   const filteredImportedRows = useMemo(() => filterAnalysisRows(importedAnalysis.rows, analysisFilters), [importedAnalysis, analysisFilters]);
   const importedMetrics = useMemo(() => computeDerivedMetrics(filteredImportedRows), [filteredImportedRows]);
   const importedComparison = useMemo(() => {
@@ -865,7 +870,8 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
                 {importedCategories.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
             </label>
-            <label className="history-toggle" title="同商品同日期的重复行自动累加，避免多份日报重叠统计"><input type="checkbox" checked={incrementalMerge} onChange={(event) => setIncrementalMerge(event.target.checked)} />增量合并</label>
+            <label>商品 ID<input type="text" placeholder="精确匹配" value={analysisFilters.productId ?? ''} onChange={(event) => setAnalysisFilters({ ...analysisFilters, productId: event.target.value })} style={{ width: 110 }} /></label>
+                        <label className="history-toggle" title="同商品同日期的重复行自动累加，避免多份日报重叠统计"><input type="checkbox" checked={incrementalMerge} onChange={(event) => setIncrementalMerge(event.target.checked)} />增量合并</label>
             <span style={{ color: '#96707f' }}>当前 {filteredImportedRows.length} / {importedAnalysis.rows.length} 行{importedAnalysis.mergedCount > 0 ? ` · 已合并 ${importedAnalysis.mergedCount} 条重复` : ''}</span>
             <button className="text-button" onClick={() => setAnalysisFilters({ dateFrom: '', dateTo: '', category: '' })}>清除筛选</button>
           </div>
@@ -1195,7 +1201,7 @@ export default function App() {
             <div className="avatar">CZ</div>
           </div>
         </header>
-        <ErrorBoundary key={active}>{active === '首页' ? <Dashboard onNavigate={setActive} savedTasks={savedTasks} savedIssues={savedIssues} /> : active === '商品数据分析' ? <AnalysisWorkspace onAddTask={(task) => updateTasks([{ ...task, source: 'manual' }, ...savedTasks])} onAddIssue={(issue) => updateIssues([{ ...issue }, ...savedIssues])} /> : active === '标题优化' ? <TitlePage /> : active === '热点与选品' ? <TrendsPage notes={savedNotes} onChange={updateNotes} /> : active === '供应商问题' ? <IssuesPage issues={savedIssues} onChange={updateIssues} /> : active === '日常任务' ? <TasksPage tasks={savedTasks} issues={savedIssues} onChange={updateTasks} /> : active === '周报与报告' ? <ReportPage /> : active === '历史项目' ? <HistoryWorkspace storage={window.localStorage} /> : active === '模板中心' ? <TemplatesPage templates={savedTemplates} onChange={updateTemplates} /> : active === '教程与帮助' ? <TutorialPage onNavigate={setActive} /> : active === '设置与数据管理' ? <SettingsPage tasks={savedTasks} issues={savedIssues} templates={savedTemplates} /> : <ModulePlaceholder title={active} onHome={() => setActive('首页')} />}</ErrorBoundary>
+        <ErrorBoundary key={active}>{active === '首页' ? <Dashboard onNavigate={setActive} savedTasks={savedTasks} savedIssues={savedIssues} onCompleteTask={(id) => updateTasks(savedTasks.map((t) => t.id === id ? { ...t, status: '已完成', updatedAt: new Date().toISOString() } : t))} onResolveIssue={(id) => updateIssues(savedIssues.map((i) => i.id === id ? { ...i, status: '已解决', updatedAt: new Date().toISOString() } : i))} /> : active === '商品数据分析' ? <AnalysisWorkspace onAddTask={(task) => updateTasks([{ ...task, source: 'manual' }, ...savedTasks])} onAddIssue={(issue) => updateIssues([{ ...issue }, ...savedIssues])} /> : active === '标题优化' ? <TitlePage /> : active === '热点与选品' ? <TrendsPage notes={savedNotes} onChange={updateNotes} /> : active === '供应商问题' ? <IssuesPage issues={savedIssues} onChange={updateIssues} /> : active === '日常任务' ? <TasksPage tasks={savedTasks} issues={savedIssues} onChange={updateTasks} /> : active === '周报与报告' ? <ReportPage /> : active === '历史项目' ? <HistoryWorkspace storage={window.localStorage} /> : active === '模板中心' ? <TemplatesPage templates={savedTemplates} onChange={updateTemplates} /> : active === '教程与帮助' ? <TutorialPage onNavigate={setActive} /> : active === '设置与数据管理' ? <SettingsPage tasks={savedTasks} issues={savedIssues} templates={savedTemplates} /> : <ModulePlaceholder title={active} onHome={() => setActive('首页')} />}</ErrorBoundary>
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={paletteItems} />
     </div>
