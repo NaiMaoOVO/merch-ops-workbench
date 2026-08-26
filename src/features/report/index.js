@@ -28,10 +28,12 @@ export function createReportDraft(report = {}) {
       .filter((item) => item && typeof item.metric === 'string')
       .map((item) => ({ metric: item.metric, previous: Number(item.previous) || 0, current: Number(item.current) || 0, changeLabel: String(item.changeLabel ?? '—') }))
     : [];
+  const annotations = report.annotations && typeof report.annotations === 'object' ? Object.entries(report.annotations).filter(([date, label]) => /^\d{4}-\d{2}-\d{2}$/.test(date) && String(label).trim()).map(([date, label]) => ({ date, label: String(label).trim().slice(0, 40) })) : [];
   return {
     id: textValue(report.id, 'report-draft'),
     period: textValue(report.period, '未配置'),
     comparison,
+    annotations,
     modules: [
       {
         id: 'overview',
@@ -112,6 +114,12 @@ export function renderReportMarkdown(draft = {}) {
     for (const item of comparison) {
       lines.push(`| ${item.metric} | ${item.previous.toLocaleString()} | ${item.current.toLocaleString()} | ${item.changeLabel} |`);
     }
+    lines.push('');
+  }
+  const annotations = Array.isArray(draft.annotations) ? draft.annotations : [];
+  if (annotations.length > 0) {
+    lines.push('## 本期事件标注', '');
+    for (const item of annotations) lines.push(`- ${item.date}：${item.label}`);
     lines.push('');
   }
   lines.push('> 本报告由本地规则分析生成；AI 辅助假设需要人工验证。');

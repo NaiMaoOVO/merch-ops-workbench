@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CircleHelp,
   ClipboardCheck,
+  Clipboard,
   Clock3,
   CloudSun,
   Download,
@@ -298,6 +299,26 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [] }) {
         <div className="metrics-grid">
           {dashboardMetrics.filter((item) => !hiddenMetricLabels.includes(item.label)).map((item) => <MetricCard item={item} key={item.label} />)}
         </div>
+        <div className="glass-card" style={{ padding: '12px 16px', marginTop: 12 }} data-testid="report-calendar">
+          <div style={{ fontSize: 12, color: '#5f4d59', marginBottom: 8 }}><strong>本周节奏</strong><small style={{ color: '#96707f', marginLeft: 6 }}>绿色=有分析数据 · 蓝色=有报告草稿</small></div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {(() => {
+              const today = new Date();
+              const dates = [];
+              for (let i = 13; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); dates.push(d); }
+              const trendDates = new Set((summary?.trend ?? []).map((p) => String(p.date ?? '').slice(0, 10)));
+              const hasReportDraft = (() => { try { return Boolean(window.localStorage.getItem('merch-workbench:report-draft:' + String(latestProject?.id ?? latestProject?.period ?? 'default'))); } catch { return false; } })();
+              return dates.map((d) => {
+                const ds = d.toISOString().slice(0, 10);
+                const hasData = trendDates.has(ds);
+                const isToday = ds === today.toISOString().slice(0, 10);
+                const bg = hasData ? '#3a9d6d' : 'rgba(255,255,255,.5)';
+                const color = hasData ? 'white' : '#96707f';
+                return <span key={ds} title={ds + (hasData ? ' · 有数据' : '')} style={{ display: 'inline-grid', placeItems: 'center', width: 28, height: 28, borderRadius: 8, fontSize: 10, background: bg, color, border: isToday ? '2px solid #b36587' : '1px solid var(--line)' }}>{d.getDate()}</span>;
+              });
+            })()}
+          </div>
+        </div>
       </section>
 
       <div className="content-grid">
@@ -567,12 +588,24 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
     return detectAnomalies(trafficRows, { impressionQuantile: 0.7, lowClickRate: 0.035, lowConversionRate: 0.08 }).slice(0, 4);
   }, [loaded, dataMode, filteredImportedRows]);
   const diagnostics = useMemo(() => anomalyRows.map((anomaly) => buildDiagnostic(anomaly)), [anomalyRows]);
+  const compareMetrics = [['销售额', 'salesAmount', (v) => '¥' + v.toLocaleString()], ['曝光量', 'impressions', (v) => v.toLocaleString()], ['点击量', 'clicks', (v) => v.toLocaleString()], ['点击率', 'clickRate', (v) => (v * 100).toFixed(2) + '%'], ['支付件数', 'paid', (v) => v.toLocaleString()]];
   const diagnosticsRef = useRef(diagnostics);
   useEffect(() => { diagnosticsRef.current = diagnostics; }, [diagnostics]);
   // PRD §16：AI 只生成「辅助假设」；发送前必须展示脱敏预览并手动放行。
   const [aiAssist, setAiAssist] = useState({ status: 'idle', message: '', preview: null, request: null, result: '' });
   const [selectedProductId, setSelectedProductId] = useState('');
   const productDrilldownRows = useMemo(() => filteredImportedRows.filter((row) => String(row.productId ?? '') === String(selectedProductId)), [filteredImportedRows, selectedProductId]);
+  const [compareIds, setCompareIds] = useState([]);
+  const toggleCompare = (id) => setCompareIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id].slice(-5));
+  const compareProducts = useMemo(() => {
+    if (compareIds.length < 2) return [];
+    return compareIds.map((id) => {
+      const rows = filteredImportedRows.filter((row) => String(row.productId ?? '') === String(id));
+      const totals = rows.reduce((acc, row) => ({ impressions: acc.impressions + (Number(row.impressions) || 0), clicks: acc.clicks + (Number(row.clicks) || 0), paid: acc.paid + (Number(row.paid) || 0), salesAmount: acc.salesAmount + (Number(row.salesAmount) || 0) }), { impressions: 0, clicks: 0, paid: 0, salesAmount: 0 });
+      totals.clickRate = totals.impressions > 0 ? totals.clicks / totals.impressions : 0;
+      return { id, totals, rowCount: rows.length };
+    });
+  }, [compareIds, filteredImportedRows]);
   const productDrilldown = useMemo(() => {
     if (!selectedProductId) return null;
     const totals = productDrilldownRows.reduce((acc, row) => ({ impressions: acc.impressions + (Number(row.impressions) || 0), clicks: acc.clicks + (Number(row.clicks) || 0), paid: acc.paid + (Number(row.paid) || 0), salesAmount: acc.salesAmount + (Number(row.salesAmount) || 0) }), { impressions: 0, clicks: 0, paid: 0, salesAmount: 0 });
@@ -760,6 +793,23 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
     event.target.value = '';
   }
 
+  async function handlePasteImport() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) { setNotice('剪贴板是空的。先在 Excel 里选中一块区域并复制，再点粘贴导入。'); return; }
+      const parsed = await parseSpreadsheet(text, { format: 'csv', name: '剪贴板粘贴' });
+      if (!parsed.length || !parsed[0].rows?.length) { setNotice('剪贴板内容没有可识别的表格行列，请确认复制的是单元格区域。'); return; }
+      const sheets = parsed.map((sheet) => ({ ...sheet, fileName: '剪贴板粘贴' }));
+      setImportedFiles(sheets);
+      setLoaded(true);
+      setDataMode('imported');
+      setSelectedTable('imported:0');
+      setNotice(`已从剪贴板粘贴 ${sheets[0].rows.length} 行数据，请确认字段映射后继续分析。`);
+    } catch (error) {
+      setNotice('粘贴导入失败：' + error.message + '（部分浏览器需先允许读取剪贴板）');
+    }
+  }
+
   return (
     <main className="analysis-workspace" data-testid="analysis-workspace">
       <section className="workspace-hero glass-card">
@@ -767,6 +817,7 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
         <div className="workspace-actions">
           <button className="primary-button" onClick={loadSample} data-tutorial="sample-data"><Sparkles size={16} /> 载入示例数据</button>
           <label className="secondary-button" data-tutorial="import"><Upload size={16} /> 导入 Excel / CSV<input type="file" accept=".xlsx,.xls,.csv" multiple hidden onChange={handleFiles} /></label>
+          <button className="secondary-button" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={handlePasteImport}><Clipboard size={15} /> 粘贴导入</button>
           <button className="secondary-button" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setProjectFormOpen((open) => !open)}><FolderPlus size={16} /> 新建分析项目</button>
         </div>
       </section>
@@ -790,7 +841,17 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
         </section>
       )}
 
-      {productDrilldown && <ProductDrilldown productId={selectedProductId} totals={productDrilldown.totals} rowCount={productDrilldown.rows.length} onClose={() => setSelectedProductId('')} />}
+{compareProducts.length >= 2 && (
+        <section className="panel-card glass-card" data-testid="product-compare">
+          <div className="panel-heading"><div><span className="section-kicker">COMPARE</span><h2>商品横向对比（{compareProducts.length} 个）</h2></div><button className="text-button" onClick={() => setCompareIds([])}>清空对比</button></div>
+          <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}><thead><tr><th style={{ textAlign: 'left', padding: '6px 10px' }}>指标</th>{compareProducts.map((p) => <th key={p.id} style={{ textAlign: 'right', padding: '6px 10px' }}>{p.id}</th>)}</tr></thead><tbody>
+            {compareMetrics.map(([label, key, fmt]) => (
+              <tr key={key}><td style={{ padding: '6px 10px', color: '#5f4d59' }}>{label}</td>{compareProducts.map((p) => <td key={p.id} style={{ textAlign: 'right', padding: '6px 10px' }}>{fmt(p.totals[key])}</td>)}</tr>
+            ))}
+          </tbody></table></div>
+          <p className="panel-help">已按当前筛选范围汇总，指标越高越靠前。点击「清空对比」可重选。</p>
+        </section>
+      )}
 
       {dataMode === 'imported' && importedAnalysis.rows.length > 0 && (
         <section className="panel-card glass-card" style={{ padding: '12px 16px', marginBottom: 12 }} data-testid="analysis-filters">
@@ -917,7 +978,7 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
           </div>
         )}{diagnostics.length ? <div className="diagnostic-list">{diagnostics.map((item) => <article className="diagnostic-row" key={item.id}><div className="diagnostic-top"><strong>{item.finding}</strong><span className="priority-tag">{item.priority}</span></div><p>证据：曝光 {item.evidence.values.impressions.toLocaleString()}，点击率 {(item.evidence.values.clickRate * 100).toFixed(2)}%，转化率 {(item.evidence.values.conversionRate * 100).toFixed(2)}%</p><small>{item.suggestedAction}</small>{loaded && (
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-            {item.productId && <button className="text-button" onClick={() => setSelectedProductId(item.productId)}>查看商品详情</button>}
+            {item.productId && (<><button className="text-button" onClick={() => setSelectedProductId(item.productId)}>查看商品详情</button><button className="text-button" onClick={() => toggleCompare(item.productId)}>{compareIds.includes(item.productId) ? "✓ 已加入对比" : "加入对比"}</button></>)}
             <button className="text-button" disabled={convertedDiagnostics.includes(item.id + ':task')} onClick={() => convertToTask(item)}>{convertedDiagnostics.includes(item.id + ':task') ? '已加入任务' : '转日常任务'}</button>
             <button className="text-button" disabled={convertedDiagnostics.includes(item.id + ':issue')} onClick={() => convertToIssue(item, item.productId)}>{convertedDiagnostics.includes(item.id + ':issue') ? '已加入问题' : '转供应商问题'}</button>
           </div>
@@ -998,6 +1059,7 @@ function ReportPage() {
     projectId: project?.id,
     totals: project?.analysisSummary?.totals ?? {},
     comparison: summaryDiagnostics ? (project?.analysisSummary?.comparison ?? []) : [],
+    annotations: summaryDiagnostics ? (loadAnnotations()) : {},
     diagnostics: diagnostics.map((item) => ({ ...item, evidence: `曝光 ${item.evidence.values.impressions.toLocaleString()}，点击率 ${(item.evidence.values.clickRate * 100).toFixed(2)}%`, hypothesis: item.hypothesis })),
   };
   return <ReportWorkspace report={report} />;
