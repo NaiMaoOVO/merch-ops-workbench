@@ -18,7 +18,8 @@ test('周一写报提醒：即使没有待办也会触发并置顶', () => {
   const brief = buildDailyNotification({ weeklyNudge: true });
   assert.ok(brief.body.startsWith('上周数据已就绪'));
   const mixed = buildDailyNotification({ weeklyNudge: true, overdueTasks: 2 });
-  assert.equal(mixed.body, '上周数据已就绪，该写周报了 · 逾期任务 2');
+  assert.equal(mixed.body, buildDailyNotification({ weeklyNudge: true, overdueTasks: 2 }).body); // 文案含动态日期，做自洽校验
+  assert.match(mixed.body, /该写周报了（本周日 \d+月\d+日 前） · 逾期任务 2/);
   assert.equal(buildDailyNotification({ weeklyNudge: false }), null);
 });
 

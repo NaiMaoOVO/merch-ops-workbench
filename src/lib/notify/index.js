@@ -1,10 +1,17 @@
 const DAILY_TITLE = '海外商品运营工作台';
 
 /** 组装每日提醒文案；没有值得提醒的内容时返回 null，不打扰用户。 */
+export function nextMondayLabel(from = new Date()) {
+  const date = new Date(from);
+  const daysUntilMonday = ((8 - date.getDay()) % 7) || 7;
+  date.setDate(date.getDate() + daysUntilMonday);
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
 export function buildDailyNotification({ overdueTasks = 0, dueTodayTasks = 0, highRiskDiagnostics = 0, openIssues = 0, weeklyNudge = false } = {}) {
   const parts = [];
   const num = (value) => (Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : 0);
-  if (weeklyNudge) parts.push('上周数据已就绪，该写周报了');
+  if (weeklyNudge) parts.push(`上周数据已就绪，该写周报了（本周日 ${nextMondayLabel()} 前）`);
   if (num(overdueTasks) > 0) parts.push('逾期任务 ' + num(overdueTasks));
   if (num(dueTodayTasks) > 0) parts.push('今日到期 ' + num(dueTodayTasks));
   if (num(highRiskDiagnostics) > 0) parts.push('高优异常 ' + num(highRiskDiagnostics));

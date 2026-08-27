@@ -45,7 +45,7 @@ import { createAnalysisProject, estimateProjectBytes, findLatestAnalysisProject,
 import { buildAnalysisSnapshot } from './lib/projects/index.js';
 import { buildTrendSeries, computeDerivedMetrics, computePeriodComparison, createRule, evaluateRules, filterAnalysisRows } from './lib/analysis/metrics.js';
 import { aggregateTrafficWithSales, buildDiagnostic, buildImportedAnalysis, buildTodayBrief, daysSinceLastImport, detectAnomalies } from './lib/analysis/index.js';
-import { enableAndSendDailyNotification, queryNotifyPermission } from './lib/notify/index.js';
+import { enableAndSendDailyNotification, nextMondayLabel, queryNotifyPermission } from './lib/notify/index.js';
 import { getMonthlyTarget, monthProgress, setMonthlyTarget } from './lib/goals/index.js';
 import { buildSparklineGeometry, buildSparklinePoints } from './lib/analysis/sparkline.js';
 import { loadAnnotations, saveAnnotations, upsertAnnotation } from './lib/storage/annotations.js';
@@ -302,7 +302,7 @@ function Dashboard({ onNavigate, savedTasks = [], savedIssues = [], onCompleteTa
           {dashboardMetrics.filter((item) => !hiddenMetricLabels.includes(item.label)).map((item) => <MetricCard item={item} key={item.label} />)}
         </div>
         <div className="glass-card" style={{ padding: '12px 16px', marginTop: 12 }} data-testid="report-calendar">
-          <div style={{ fontSize: 12, color: '#5f4d59', marginBottom: 8 }}><strong>本周节奏</strong><small style={{ color: '#96707f', marginLeft: 6 }}>绿色=有分析数据 · 蓝色=有报告草稿</small></div>
+          <div style={{ fontSize: 12, color: '#5f4d59', marginBottom: 8 }}><strong>本周节奏</strong><small style={{ color: '#96707f', marginLeft: 6 }}>绿色=有分析数据 · 蓝色=有报告草稿 · 下个周报日 {nextMondayLabel()}</small></div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {(() => {
               const today = new Date();
@@ -598,7 +598,10 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
       : aggregateTrafficWithSales(sampleFixtureBundle.tables.traffic.rows, sampleFixtureBundle.tables.sales.rows);
     return detectAnomalies(trafficRows, { impressionQuantile: 0.7, lowClickRate: 0.035, lowConversionRate: 0.08 }).slice(0, 4);
   }, [loaded, dataMode, filteredImportedRows]);
-  const diagnostics = useMemo(() => anomalyRows.map((anomaly) => buildDiagnostic(anomaly)), [anomalyRows]);
+  const diagnostics = useMemo(() => {
+    const order = { 高: 0, 中: 1, 低: 2 };
+    return anomalyRows.map((anomaly) => buildDiagnostic(anomaly)).sort((a, b) => (order[a.priority] ?? 3) - (order[b.priority] ?? 3));
+  }, [anomalyRows]);
   const compareMetrics = [['销售额', 'salesAmount', (v) => '¥' + v.toLocaleString()], ['曝光量', 'impressions', (v) => v.toLocaleString()], ['点击量', 'clicks', (v) => v.toLocaleString()], ['点击率', 'clickRate', (v) => (v * 100).toFixed(2) + '%'], ['支付件数', 'paid', (v) => v.toLocaleString()]];
   const diagnosticsRef = useRef(diagnostics);
   useEffect(() => { diagnosticsRef.current = diagnostics; }, [diagnostics]);
@@ -877,6 +880,7 @@ function AnalysisWorkspace({ onAddTask, onAddIssue }) {
               </select>
             </label>
             <label>商品 ID<input type="text" placeholder="精确匹配" value={analysisFilters.productId ?? ''} onChange={(event) => setAnalysisFilters({ ...analysisFilters, productId: event.target.value })} style={{ width: 110 }} /></label>
+            <button className="text-button" onClick={() => setAnalysisFilters({ dateFrom: '', dateTo: '', category: '', productId: '' })} title="清空全部筛选">重置筛选</button>
                         <label className="history-toggle" title="同商品同日期的重复行自动累加，避免多份日报重叠统计"><input type="checkbox" checked={incrementalMerge} onChange={(event) => setIncrementalMerge(event.target.checked)} />增量合并</label>
             <span style={{ color: '#96707f' }}>当前 {filteredImportedRows.length} / {importedAnalysis.rows.length} 行{importedAnalysis.mergedCount > 0 ? ` · 已合并 ${importedAnalysis.mergedCount} 条重复` : ''}</span>
             <button className="text-button" onClick={() => setAnalysisFilters({ dateFrom: '', dateTo: '', category: '' })}>清除筛选</button>
